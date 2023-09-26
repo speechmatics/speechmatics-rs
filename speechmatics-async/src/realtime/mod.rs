@@ -1,25 +1,32 @@
 use anyhow::Result;
-use futures::{StreamExt, stream::{SplitStream, SplitSink}, pin_mut, future::{self, Either}, SinkExt, TryStreamExt};
+use futures::{StreamExt, stream::{SplitStream, SplitSink}, pin_mut, SinkExt};
 use tokio::net::TcpStream;
 use tokio_tungstenite::MaybeTlsStream;
-use tokio_tungstenite::{tungstenite, connect_async, tungstenite::Message, WebSocketStream};
+use tokio_tungstenite::{connect_async, tungstenite::Message, WebSocketStream};
 use rand::{thread_rng, Rng};
 use rand::distributions::Alphanumeric;use base64::{Engine as _, engine::general_purpose};
 use url::Url;
 use serde_json::from_slice;
 use handlers::Attach;
-
+use std::pin::Pin;
+use std::boxed::Box;
 use http::Request;
 use std::io::Read;
+use tokio::join;
 
+#[cfg(test)]
+use std::{println as error, println as debug, println as info, println as warn};
+
+
+#[cfg(not(test))]
 use log::{error, debug, info, warn};
 
 mod handlers;
 pub mod models;
 
-const DEFAULT_RT_URL: &str = "wss://eu2.rt.speechmatics.com/v2/en";
-const DEFAULT_LANGUAGE: &str = "en";
-const DEFAULT_SAMPLE_RATE: i32 = 48_000;
+pub const DEFAULT_RT_URL: &str = "wss://eu2.rt.speechmatics.com/v2/en";
+pub const DEFAULT_LANGUAGE: &str = "en";
+pub const DEFAULT_SAMPLE_RATE: i32 = 48_000;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SessionConfig {
@@ -28,14 +35,10 @@ pub struct SessionConfig {
     audio_format: Option<models::AudioFormat>,
 }
 
-enum AudioVector {
-    PcmF32le(Vec<f32>),
-    PcmS16le(Vec<i16>),
-}
-
 impl Default for SessionConfig {
     fn default() -> Self {
-        let transcription_config: models::TranscriptionConfig = Default::default();
+        let mut transcription_config: models::TranscriptionConfig = Default::default();
+        transcription_config.language = DEFAULT_LANGUAGE.to_owned();
         let translation_config: models::TranslationConfig = Default::default();
         let audio_format: models::AudioFormat = Default::default();
         Self {
@@ -52,6 +55,7 @@ pub struct RealtimeSession {
     pub auth_token: String,
     pub rt_url: String,
     handlers: handlers::EventHandlers,
+    running: bool,
 }
 
 impl RealtimeSession {
@@ -61,10 +65,11 @@ impl RealtimeSession {
         if let Some(temp_url) = rt_url {
             url = temp_url
         }
-        let mut sesh = Self {
+        let sesh = Self {
             auth_token,
             rt_url: url,
             handlers: handlers::EventHandlers::new(),
+            running: false,
         };
         Ok(sesh)
     }
@@ -111,24 +116,46 @@ impl RealtimeSession {
         Ok((sender, reader))
     }
 
-    async fn wait_for_start(&self, receiver: &mut SplitStreamAlias) -> Result<()> {
+    async fn wait_for_start(&mut self, receiver: &mut SplitStreamAlias) -> Result<()> {
         let mut retries = 0;
         let max_retries = 5;
         let mut success = false;
-        let value = receiver.try_for_each(move |message| async {
-            let bin_data = message.into_data();
-            // this deserialise will fail if not the right message type
-            let _: models::RecognitionStarted = match serde_json::from_slice(&bin_data) {
-                Ok(val) => {
-                    val
-                }
-                Err(err) => {
-                    warn!("Could not read value of message into RecognitionStarted struct, {:?}", err);
-                    models::RecognitionStarted::new(models::recognition_started::Message::RecognitionStarted)
-                }
-            };
-            Ok(())
-        }).await?;
+        while !success {
+            let value = receiver.next().await;
+            if let Some(val) = value {
+                let message = match val {
+                    Ok(v) => v,
+                    Err(err) => {
+                        warn!("Failed to get data from stream, {:?}", err);
+                        retries += 1;
+                        if retries > max_retries {
+                            todo!()
+                        }
+                        continue;
+                    },
+                };
+                debug!("{:?}", message);
+                let bin_data = message.into_data();
+                // this deserialise will fail if not the right message type
+                match serde_json::from_slice::<models::RecognitionStarted>(&bin_data) {
+                    Ok(_) => {
+                        success = true;
+                        self.handlers.handle_event(models::Messages::RecognitionStarted, bin_data).await?;
+                        self.running = true;
+                    }
+                    Err(err) => {
+                        warn!("Could not read value of message into RecognitionStarted struct, {:?}", err);
+                        retries += 1;
+                        if retries > max_retries {
+                            todo!()
+                        }
+                        continue;
+                    }
+                };
+            } else {
+                todo!()
+            }
+        }
         Ok(())
     }
 
@@ -150,27 +177,43 @@ impl RealtimeSession {
         };
 
         pin_mut!(process_messages, send_audio);
-        match future::select(process_messages, send_audio).await {
-            Either::Left(s) => s.0,
-            Either::Right(s) => s.0
-        }
+        let (messages_res, audio_res) = join!(process_messages, send_audio);
+        match audio_res {
+            Ok(_) => debug!("No issues in audio processing task"),
+            Err(err) => return Err(err)
+        };
+        match messages_res {
+            Ok(_) => debug!("No issues detected whilst processing server-sent messages"),
+            Err(err) => return Err(err)
+        };
+        Ok(())
     }
 
-    pub async fn process_messages(&mut self, receiver: SplitStreamAlias) -> Result<()> {
-        receiver.try_for_each(move |message| async {
-            let data = message.into_data();
-            // Parse the string of data into serde_json::Value.
-            let value: models::RealtimeMessage = from_slice(&data).unwrap();
-            if let Some(msg) = value.message {
-                if models::Messages::EndOfTranscript == msg {
-                    let _: models::EndOfTranscript = from_slice(&data).unwrap();
+    pub async fn process_messages(&mut self, mut receiver: SplitStreamAlias) -> Result<()> {
+        while self.running {
+            let result = receiver.next().await;
+            debug!("here i am");
+            if let Some(val) = result {
+                let mess = val?;
+                debug!("{}", mess);
+                let data = mess.into_data();
+                // Parse the string of data into serde_json::Value.
+                let value: models::RealtimeMessage = from_slice(&data)?;
+                if let Some(msg) = value.message {
+                    if models::Messages::EndOfTranscript == msg {
+                        let _: models::EndOfTranscript = from_slice(&data)?;
+                        debug!("detected EndOfTranscript message, quitting");
+                        self.running = false;
+                    };
+                    self.handlers.handle_event(msg, data).await?;
+                } else {
+                    error!("Something went wrong unpacking the message, the message value was None");
                 };
-                // self.handlers.handle_event(msg.clone(), data.clone()).unwrap();
             } else {
-                error!("Something went wrong unpacking the message, the message value was None");
-            };
-            Ok(())
-        });
+                todo!()
+            }
+        }
+        debug!("Exited message processing loop");
         Ok(())
     }
 }
@@ -250,6 +293,7 @@ impl SenderWrapper {
         }
         let serialised_msg = serde_json::to_string(&message)?;
         let ws_message = Message::from(serialised_msg);
+        debug!("sending StartRecognition message {:?}", ws_message);
         self.send_message(ws_message).await
     }
 
@@ -286,12 +330,13 @@ mod tests {
     use std::path::PathBuf;
     use std::fs::File;
 
+    use futures::Future;
     use tokio;
 
     #[tokio::test]
     async fn test_basic_flow() {
         let mut rt_session =
-            RealtimeSession::new("INSERT_API_KEY".to_owned(), None).unwrap();
+            RealtimeSession::new("INSERT_KEY_HERE".to_owned(), None).unwrap();
 
         let test_file_path = PathBuf::new()
             .join("..")
@@ -305,11 +350,13 @@ mod tests {
         let audio_config = models::AudioFormat::new(models::audio_format::RHashType::File);
         config.audio_format = Some(audio_config);
 
-        async fn closure(input: models::AddTranscript) -> ()  {
-            println!("This is a test, you should see AddTranscript message logs in the terminal {:?}", input)
-        };
+        fn closure(input: models::AddTranscript) -> Pin<Box<dyn Future<Output = ()>>>  {
+            Box::pin(async move {
+                println!("{:?}", input)
+            })
+        }
 
-        // add_event_handler!(&mut rt_session, handlers::AddTranscriptCallback, closure);
+        add_event_handler!(&mut rt_session, handlers::AddTranscriptCallback, closure);
 
         rt_session.run(config, file).await.unwrap();
     }
