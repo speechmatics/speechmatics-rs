@@ -7,8 +7,6 @@ use rand::{thread_rng, Rng};
 use rand::distributions::Alphanumeric;use base64::{Engine as _, engine::general_purpose};
 use url::Url;
 use serde_json::from_slice;
-use handlers::Attach;
-use std::pin::Pin;
 use std::boxed::Box;
 use http::Request;
 use std::io::Read;
@@ -21,13 +19,15 @@ use std::{println as error, println as debug, println as info, println as warn};
 #[cfg(not(test))]
 use log::{error, debug, info, warn};
 
-mod handlers;
+pub mod handlers;
 pub mod models;
 
 pub const DEFAULT_RT_URL: &str = "wss://eu2.rt.speechmatics.com/v2/en";
 pub const DEFAULT_LANGUAGE: &str = "en";
 pub const DEFAULT_SAMPLE_RATE: i32 = 48_000;
 
+/// SessionConfig is the struct which is passed into run (and then start_recognition) to configure the realtime session.
+/// It implements default, which sets the language as English and otherwise sets everything to the API default.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SessionConfig {
     transcription_config: Option<models::TranscriptionConfig>,
@@ -51,6 +51,9 @@ impl Default for SessionConfig {
 
 type SplitStreamAlias = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
+/// RealtimeSession is struct that contains everything about the session. It includes the two mains functions:
+/// - new to instantiate the session.
+/// - run to start running the session. Run is an async function that can be joined or selected with other futures
 pub struct RealtimeSession {
     pub auth_token: String,
     pub rt_url: String,
@@ -59,6 +62,7 @@ pub struct RealtimeSession {
 }
 
 impl RealtimeSession {
+    /// new(auth_token, rt_url) instantiates a RealtimeSession struct ready to be called to run
     pub fn new(auth_token: String, rt_url: Option<String>) -> Result<Self>
     {
         let mut url = DEFAULT_RT_URL.to_owned();
@@ -74,6 +78,8 @@ impl RealtimeSession {
         Ok(sesh)
     }
 
+    /// connect is an internal function that handles the TCP handshake, TLS handshake and websocket handshake
+    /// It ultimately returns the send and receive parts of the websocket.
     async fn connect(&mut self) -> Result<(SenderWrapper, SplitStreamAlias)> {
         let sec_key: String = thread_rng()
             .sample_iter(&Alphanumeric)
@@ -116,6 +122,10 @@ impl RealtimeSession {
         Ok((sender, reader))
     }
 
+    /// Wait for start reads messages in a loop until one of a set of coniditions is met:
+    /// 1. We receive RecognitionStarted, at which point the rt session begins in earnest
+    /// 2. We receive an error, in which case we exit
+    /// 3. We receive some other message, in which case we retry the function a set number of times
     async fn wait_for_start(&mut self, receiver: &mut SplitStreamAlias) -> Result<()> {
         let mut retries = 0;
         let max_retries = 5;
@@ -159,6 +169,15 @@ impl RealtimeSession {
         Ok(())
     }
 
+    /// run - run is the main function of the RealtimeSession struct. It connects to the WebSocket,
+    /// handles auth and sends a StartRecognition message to the websocket. It then waits until the server acknowledges
+    /// the start of the session and then concurrently sends audio data and calls the user-registered handler functions.
+    /// 
+    /// The config parameter sets the SessionConfig for the transcriber, including transcription, translation and audio source config.
+    /// Although it is not yet, implemented, it is possible to update transcriber config on the fly.
+    /// 
+    /// The reader parameter accepts anything that satisfies Read and Send e.g. a File, a BufReader, a Cursor.
+    /// This allows the user to flexibly provide any audio source of their choice.
     pub async fn run<R: Read + std::marker::Send + 'static>(
         &mut self,
         config: SessionConfig,
@@ -189,7 +208,7 @@ impl RealtimeSession {
         Ok(())
     }
 
-    pub async fn process_messages(&mut self, mut receiver: SplitStreamAlias) -> Result<()> {
+    async fn process_messages(&mut self, mut receiver: SplitStreamAlias) -> Result<()> {
         while self.running {
             let result = receiver.next().await;
             debug!("here i am");
@@ -218,11 +237,7 @@ impl RealtimeSession {
     }
 }
 
-pub struct ReceiverWrapper {
-    pub socket: SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>,
-}
-
-pub struct SenderWrapper {
+struct SenderWrapper {
     pub socket: SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tokio_tungstenite::tungstenite::Message>,
     last_seq_no: i32,
 }
@@ -232,7 +247,7 @@ impl SenderWrapper {
         Self { socket, last_seq_no: 0 }
     }
 
-    pub async fn send_audio<R: Read + std::marker::Send + 'static>(&mut self, mut reader: R) -> Result<()> {
+    async fn send_audio<R: Read + std::marker::Send + 'static>(&mut self, mut reader: R) -> Result<()> {
         let mut buffer = vec![0u8; 8192];
         loop {
             debug!("reading audio data");
@@ -297,19 +312,20 @@ impl SenderWrapper {
         self.send_message(ws_message).await
     }
 
-    pub async fn send_close(&mut self, last_seq_no: i32) -> Result<()> {
+    async fn send_close(&mut self, last_seq_no: i32) -> Result<()> {
         let message = models::EndOfStream::new(last_seq_no, models::end_of_stream::Message::EndOfStream);
         let serialised_msg = serde_json::to_string(&message)?;
         let tungstenite_msg = Message::from(serialised_msg);
         self.send_message(tungstenite_msg).await
     }
-
-    pub async fn close(&mut self) -> Result<()> {
-        self.socket.close().await?;
-        Ok(())
-    }
 }
 
+/// add_event_handler is the main macro for attaching event handler functions to the realtime session.
+/// It is a very simple wrapper that coerces the function to the correct function pointer type and calls the attach method.
+/// 
+/// Because it uses the attach method, it requires you to include the Attach trait from the handlers module e.g.
+/// 
+/// `use speechmatics_async::realtime::handlers::Attach;`
 #[allow(unused_macros)]
 macro_rules! add_event_handler {
     // This macro takes an expression of type `expr` and prints
@@ -327,6 +343,8 @@ pub(crate) use add_event_handler;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use handlers::Attach;
+    use std::pin::Pin;
     use std::path::PathBuf;
     use std::fs::File;
 

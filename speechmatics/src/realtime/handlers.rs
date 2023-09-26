@@ -1,10 +1,11 @@
-//! This module is auto-generated - do not edit!
 use anyhow::Result;
 use log::{debug, error};
 use serde_json::from_slice;
 
 use crate::realtime::models;
 
+// The Attach trait was my way to get the macro for attaching event handlers working in a hacky way.
+// We should try to found a way to do it that doesn't require the user to import this trait if possible.
 pub trait Attach {
     fn attach(&self, handlers: &mut EventHandlers);
 }

@@ -1,4 +1,4 @@
-//! This module is auto-generated - do not edit!
+
 use anyhow::Result;
 use futures::Future;
 use log::debug;
