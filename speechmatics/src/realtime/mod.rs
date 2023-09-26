@@ -49,7 +49,7 @@ pub struct RealtimeSession {
     pub auth_token: String,
     pub rt_url: String,
     handlers: handlers::EventHandlers,
-    socket: SocketWrapper,
+    reader_empty: bool,
 }
 
 impl RealtimeSession {
@@ -62,11 +62,11 @@ impl RealtimeSession {
             auth_token,
             rt_url: url,
             handlers: handlers::EventHandlers::new(),
-            socket: SocketWrapper::new(),
+            reader_empty: false,
         }
     }
 
-    fn connect(&mut self) -> Result<()> {
+    fn connect(&mut self) -> Result<SocketWrapper> {
         let sec_key: String = thread_rng()
             .sample_iter(&Alphanumeric)
             .take(16)
@@ -115,19 +115,16 @@ impl RealtimeSession {
 
         let mut ws_conf = WebSocketConfig::default();
         ws_conf.max_message_size = None;
-        ws_conf.write_buffer_size = 1000_000;
-        ws_conf.max_write_buffer_size = 1000_001;
         stream.set_config(|conf| *conf = ws_conf.clone());
-        self.socket.socket = Some(Arc::new(Mutex::new(stream)));
-        Ok(())
+        Ok(SocketWrapper::new(stream))
     }
 
-    fn wait_for_start(&self) -> Result<()> {
+    fn wait_for_start(&self, wrapper: &mut SocketWrapper) -> Result<()> {
         let mut success = false;
         let mut retries = 0;
         let max_retries = 5;
         while !success {
-            if let Some(message) = self.socket.read()? {
+            if let Some(message) = wrapper.read()? {
                 println!("{message}");
                 let bin_data = message.into_data();
                 // this deserialise will fail if not the right message type
@@ -159,14 +156,14 @@ impl RealtimeSession {
         config: SessionConfig,
         mut reader: R,
     ) -> Result<()> {
-        self.connect()?;
-        self.socket.start_recognition(config)?;
-        self.wait_for_start()?;
+        let mut wrapper = self.connect()?;
+        wrapper.start_recognition(config)?;
+        self.wait_for_start(&mut wrapper)?;
         let mut buffer = vec![0u8; 8192];
 
         loop {
             // If there is a message, read it, otherwise send a chunk of audio data and check messages again
-            if let Some(message) = self.socket.read()? {
+            if let Some(message) = wrapper.read()? {
                 debug!("{message}");
                 let bin_data = message.into_data();
                 // Parse the string of data into serde_json::Value.
@@ -174,7 +171,7 @@ impl RealtimeSession {
                 if let Some(msg) = value.message {
                     if models::Messages::EndOfTranscript == msg {
                         let _: models::EndOfTranscript = from_slice(&bin_data)?;
-                        self.socket.close()?;
+                        wrapper.close()?;
                         break;
                     };
                     self.handlers.handle_event(msg, bin_data)?;
@@ -182,74 +179,66 @@ impl RealtimeSession {
                     error!("Something went wrong unpacking the message, the message value was None");
                 }
             };
-            debug!("reading audio data");
-            match reader.read(&mut buffer) {
-                Ok(no) => {
-                    if no == 0 {
-                        info!("Reader was empty, closing stream");
-                        self.socket.send_close(self.socket.last_seq_no)?;
-                        return Ok(())
-                    } else {
-                        debug!("Sending audio length {no}");
-                        let tu_message = Message::from(&buffer[..no]);
-                        self.socket.send_message(tu_message)?;
-                        self.socket.last_seq_no += 1;
-                    }
-                }
-                Err(_) => {
-                    info!("encountered an error reading audio data, closing the stream");
-                    self.socket.send_close(self.socket.last_seq_no)?;
-                }
-            };
-        }
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-pub struct SocketWrapper {
-    pub socket: Option<Arc<Mutex<WebSocket<MaybeTlsStream<TcpStream>>>>>,
-    last_seq_no: i32,
-}
-
-impl SocketWrapper {
-    fn new() -> Self {
-        Self { socket: None, last_seq_no: 0 }
-    }
-
-    fn send_message(&self, message: Message) -> Result<()> {
-        if let Some(ws_stream) = &self.socket {
-            let mut stream = match ws_stream.lock() {
-                Ok(s) => s,
-                Err(fail_lock) => {
-                    let guard = fail_lock.into_inner();
-                    guard
-                }
-            };
-            let mut retries = 0;
-            let max_retries = 5;
-            let mut success = false;
-            while !success {
-                match stream.send(message.clone()) {
-                    Ok(()) => (),
-                    Err(err) => {
-                        retries += 1;
-                        if retries >= max_retries {
-                            error!("{:?}", err);
-                            stream.send(message)?;
-                            panic!("arg too many attempts to send")
+            if !self.reader_empty {
+                match reader.read(&mut buffer) {
+                    Ok(no) => {
+                        if no == 0 {
+                            info!("Reader was empty, closing stream");
+                            wrapper.send_close()?;
+                            self.reader_empty = true;
+                        } else {
+                            debug!("Sending audio length {no}");
+                            let tu_message = Message::from(&buffer[..no]);
+                            wrapper.send_message(tu_message)?;
+                            wrapper.last_seq_no += 1;
                         }
-                        std::thread::sleep(std::time::Duration::from_millis(100));
-                        continue;
+                    }
+                    Err(_) => {
+                        info!("encountered an error reading audio data, closing the stream");
+                        wrapper.send_close()?;
+                        self.reader_empty = true;
                     }
                 };
-                success = true
             }
         }
         Ok(())
     }
+}
 
-    fn start_recognition(&self, config: SessionConfig) -> Result<()> {
+pub struct SocketWrapper {
+    pub socket: WebSocket<MaybeTlsStream<TcpStream>>,
+    last_seq_no: i32,
+}
+
+impl SocketWrapper {
+    fn new(socket: WebSocket<MaybeTlsStream<TcpStream>>) -> Self {
+        Self { socket, last_seq_no: 0 }
+    }
+
+    fn send_message(&mut self, message: Message) -> Result<()> {
+        let mut retries = 0;
+        let max_retries = 5;
+        let mut success = false;
+        while !success {
+            match self.socket.write_message(message.clone()) {
+                Ok(()) => (),
+                Err(err) => {
+                    retries += 1;
+                    if retries >= max_retries {
+                        error!("{:?}", err);
+                        self.socket.write_message(message)?;
+                        panic!("arg too many attempts to send")
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    continue;
+                }
+            };
+            success = true
+        }
+        Ok(())
+    }
+
+    fn start_recognition(&mut self, config: SessionConfig) -> Result<()> {
         let mut message: models::StartRecognition = Default::default();
         if let Some(aud) = config.audio_format {
             message.audio_format = Box::new(aud);
@@ -265,78 +254,32 @@ impl SocketWrapper {
         self.send_message(ws_message)
     }
 
-    pub fn send_close(&self, last_seq_no: i32) -> Result<()> {
-        let message = models::EndOfStream::new(last_seq_no, models::end_of_stream::Message::EndOfStream);
+    pub fn send_close(&mut self) -> Result<()> {
+        let message = models::EndOfStream::new(self.last_seq_no, models::end_of_stream::Message::EndOfStream);
         let serialised_msg = serde_json::to_string(&message)?;
         let tungstenite_msg = Message::from(serialised_msg);
         self.send_message(tungstenite_msg)
     }
 
-    pub fn can_read(&self) -> Result<bool> {
-        if let Some(sock) = &self.socket {
-            let stream = match sock.lock() {
-                Ok(s) => s,
-                Err(fail_lock) => {
-                    let guard = fail_lock.into_inner();
-                    guard
-                }
-            };
-            Ok(stream.can_read())
-        } else {
-            Ok(false)
-        }
-    }
-
-    pub fn can_write(&self) -> Result<bool> {
-        if let Some(sock) = &self.socket {
-            let stream = match sock.lock() {
-                Ok(s) => s,
-                Err(fail_lock) => {
-                    let guard = fail_lock.into_inner();
-                    guard
-                }
-            };
-            Ok(stream.can_write())
-        } else {
-            Ok(false)
-        }
-    }
-
-    pub fn read(&self) -> Result<Option<Message>> {
-        if let Some(sock) = &self.socket {
-            let mut stream = match sock.lock() {
-                Ok(s) => s,
-                Err(fail_lock) => {
-                    let guard = fail_lock.into_inner();
-                    guard
-                }
-            };
-            let mess = match stream.read() {
-                Ok(mess) => Some(mess),
-                Err(e) => {
-                    if let tungstenite::error::Error::Io(e) = &e {
-                        if e.kind() == std::io::ErrorKind::WouldBlock {
-                            return Ok(None)
-                        }
+    pub fn read(&mut self) -> Result<Option<Message>> {
+        let mess = match self.socket.read_message() {
+            Ok(mess) => Some(mess),
+            Err(e) => {
+                if let tungstenite::error::Error::Io(e) = &e {
+                    if e.kind() == std::io::ErrorKind::WouldBlock {
+                        return Ok(None)
                     }
-                    error!("{:?}", e);
-                    return Err(anyhow::Error::from(e))
                 }
-            };
-            Ok(mess)
-        } else {
-            todo!()
-        }
+                error!("{:?}", e);
+                return Err(anyhow::Error::from(e))
+            }
+        };
+        Ok(mess)
     }
 
-    pub fn close(&self) -> Result<()> {
-        if let Some(sock) = &self.socket {
-            let mut lock_sock = sock.lock().unwrap();
-            lock_sock.close(None)?;
-            Ok(())
-        } else {
-            todo!()
-        }
+    pub fn close(&mut self) -> Result<()> {
+        self.socket.close(None)?;
+        Ok(())
     }
 }
 
