@@ -24,18 +24,18 @@ pub struct Warning {
     #[serde(rename = "seq_no", skip_serializing_if = "Option::is_none")]
     pub seq_no: Option<i32>,
     #[serde(rename = "type")]
-    pub r#type: RHashType,
+    pub type_value: Type,
 }
 
 impl Warning {
-    pub fn new(message: Message, reason: String, r#type: RHashType) -> Warning {
+    pub fn new(message: Message, reason: String, type_value: Type) -> Warning {
         Warning {
             code: None,
             duration_limit: None,
             message,
             reason,
             seq_no: None,
-            r#type,
+            type_value,
         }
     }
 }
@@ -54,13 +54,13 @@ impl Default for Message {
 }
 /// 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub enum RHashType {
+pub enum Type {
     #[serde(rename = "duration_limit_exceeded")]
     DurationLimitExceeded,
 }
 
-impl Default for RHashType {
-    fn default() -> RHashType {
+impl Default for Type {
+    fn default() -> Type {
         Self::DurationLimitExceeded
     }
 }

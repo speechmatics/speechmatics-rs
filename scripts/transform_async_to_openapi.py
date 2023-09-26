@@ -2,18 +2,6 @@ import sys
 import yaml
 import re
 
-# Add RT prefix to some names to dedupe from batch
-map_names = [
-#     "TranscriptionConfig",
-#     "TranslationConfig",
-#     "SpeakerChangeSensitivity",
-#     "DiarizationConfig",
-#     "SpeakerDiarizationConfig",
-#     "RecognitionResult",
-#     "RecognitionMetadata",
-#     "RecognitionAlternative",
-#     "RecognitionDisplay"
-]
     
 publish_messages = [
     "StartRecognition","AddAudio","EndOfStream","SetRecognitionConfig"
@@ -23,9 +11,6 @@ publish_messages = [
 with open("../schemas/realtime.yml", 'r') as stream:
     try:
         spec = stream.read()
-        for item in map_names:
-            # We can't do a naive replace as DiarizationConfig is a substring of SpeakerDiarizationConfig
-            spec = re.sub(f"(?![A-Za-z])(.)({item})", r"\1Realtime\2", spec)
         async_spec = yaml.safe_load(spec)
     except yaml.YAMLError as exc:
         print(exc)

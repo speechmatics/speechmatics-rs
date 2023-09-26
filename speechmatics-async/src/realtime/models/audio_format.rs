@@ -18,15 +18,15 @@ pub struct AudioFormat {
     #[serde(rename = "sample_rate", skip_serializing_if = "Option::is_none")]
     pub sample_rate: Option<i32>,
     #[serde(rename = "type")]
-    pub r#type: RHashType,
+    pub type_value: Type,
 }
 
 impl AudioFormat {
-    pub fn new(r#type: RHashType) -> AudioFormat {
+    pub fn new(type_value: Type) -> AudioFormat {
         AudioFormat {
             encoding: None,
             sample_rate: None,
-            r#type,
+            type_value,
         }
     }
 }
@@ -49,15 +49,15 @@ impl Default for Encoding {
 }
 /// 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub enum RHashType {
+pub enum Type {
     #[serde(rename = "raw")]
     Raw,
     #[serde(rename = "file")]
     File,
 }
 
-impl Default for RHashType {
-    fn default() -> RHashType {
+impl Default for Type {
+    fn default() -> Type {
         Self::Raw
     }
 }

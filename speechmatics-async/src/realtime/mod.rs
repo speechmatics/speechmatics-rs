@@ -365,7 +365,7 @@ mod tests {
         let file = File::open(test_file_path).unwrap();
 
         let mut config: SessionConfig = Default::default();
-        let audio_config = models::AudioFormat::new(models::audio_format::RHashType::File);
+        let audio_config = models::AudioFormat::new(models::audio_format::Type::File);
         config.audio_format = Some(audio_config);
 
         fn closure(input: models::AddTranscript) -> Pin<Box<dyn Future<Output = ()>>>  {

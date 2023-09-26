@@ -28,11 +28,11 @@ pub struct RecognitionResult {
     #[serde(rename = "start_time")]
     pub start_time: f32,
     #[serde(rename = "type")]
-    pub r#type: RHashType,
+    pub type_value: Type,
 }
 
 impl RecognitionResult {
-    pub fn new(end_time: f32, start_time: f32, r#type: RHashType) -> RecognitionResult {
+    pub fn new(end_time: f32, start_time: f32, type_value: Type) -> RecognitionResult {
         RecognitionResult {
             alternatives: None,
             attaches_to: None,
@@ -41,7 +41,7 @@ impl RecognitionResult {
             is_eos: None,
             score: None,
             start_time,
-            r#type,
+            type_value,
         }
     }
 }
@@ -66,7 +66,7 @@ impl Default for AttachesTo {
 }
 /// 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub enum RHashType {
+pub enum Type {
     #[serde(rename = "word")]
     Word,
     #[serde(rename = "punctuation")]
@@ -75,8 +75,8 @@ pub enum RHashType {
     SpeakerChange,
 }
 
-impl Default for RHashType {
-    fn default() -> RHashType {
+impl Default for Type {
+    fn default() -> Type {
         Self::Word
     }
 }

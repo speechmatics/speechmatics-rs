@@ -2,3 +2,4 @@
 extern crate serde;
 
 pub mod realtime;
+pub mod batch;

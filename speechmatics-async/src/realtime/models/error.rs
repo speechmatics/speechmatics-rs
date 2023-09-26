@@ -22,17 +22,17 @@ pub struct Error {
     #[serde(rename = "seq_no", skip_serializing_if = "Option::is_none")]
     pub seq_no: Option<i32>,
     #[serde(rename = "type")]
-    pub r#type: RHashType,
+    pub type_value: Type,
 }
 
 impl Error {
-    pub fn new(message: Message, reason: String, r#type: RHashType) -> Error {
+    pub fn new(message: Message, reason: String, type_value: Type) -> Error {
         Error {
             code: None,
             message,
             reason,
             seq_no: None,
-            r#type,
+            type_value,
         }
     }
 }
@@ -51,7 +51,7 @@ impl Default for Message {
 }
 /// 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub enum RHashType {
+pub enum Type {
     #[serde(rename = "invalid_message")]
     InvalidMessage,
     #[serde(rename = "invalid_model")]
@@ -78,8 +78,8 @@ pub enum RHashType {
     UnknownError,
 }
 
-impl Default for RHashType {
-    fn default() -> RHashType {
+impl Default for Type {
+    fn default() -> Type {
         Self::InvalidMessage
     }
 }

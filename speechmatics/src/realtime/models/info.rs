@@ -24,18 +24,18 @@ pub struct Info {
     #[serde(rename = "seq_no", skip_serializing_if = "Option::is_none")]
     pub seq_no: Option<i32>,
     #[serde(rename = "type")]
-    pub r#type: RHashType,
+    pub type_value: Type,
 }
 
 impl Info {
-    pub fn new(message: Message, reason: String, r#type: RHashType) -> Info {
+    pub fn new(message: Message, reason: String, type_value: Type) -> Info {
         Info {
             code: None,
             message,
             quality: None,
             reason,
             seq_no: None,
-            r#type,
+            type_value,
         }
     }
 }
@@ -54,7 +54,7 @@ impl Default for Message {
 }
 /// 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub enum RHashType {
+pub enum Type {
     #[serde(rename = "recognition_quality")]
     RecognitionQuality,
     #[serde(rename = "model_redirect")]
@@ -63,8 +63,8 @@ pub enum RHashType {
     Deprecated,
 }
 
-impl Default for RHashType {
-    fn default() -> RHashType {
+impl Default for Type {
+    fn default() -> Type {
         Self::RecognitionQuality
     }
 }
