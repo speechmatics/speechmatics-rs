@@ -66,7 +66,7 @@ impl RealtimeSession {
         }
     }
 
-    pub fn connect(&mut self) -> Result<()> {
+    fn connect(&mut self) -> Result<()> {
         let sec_key: String = thread_rng()
             .sample_iter(&Alphanumeric)
             .take(16)
@@ -159,6 +159,7 @@ impl RealtimeSession {
         config: SessionConfig,
         mut reader: R,
     ) -> Result<()> {
+        self.connect()?;
         self.socket.start_recognition(config)?;
         self.wait_for_start()?;
         let mut buffer = vec![0u8; 8192];
@@ -364,7 +365,6 @@ mod tests {
     fn test_basic_flow() {
         let mut rt_session =
             RealtimeSession::new("INSERT_API_KEY".to_owned(), None);
-        rt_session.connect().unwrap();
 
         let test_file_path = PathBuf::new()
             .join("..")
