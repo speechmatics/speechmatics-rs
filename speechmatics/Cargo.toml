@@ -9,7 +9,7 @@ authors = ["Tudor Evans"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tungstenite = { version = "0.20.0", features = ["native-tls"] }
+tungstenite = { version = "0.19.0", features = ["native-tls"] }
 anyhow = "1.0"
 http = "0.2.9"
 log = "0.4.20"
