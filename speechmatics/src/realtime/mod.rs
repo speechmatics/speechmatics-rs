@@ -1,22 +1,20 @@
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
+use http::Request;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use http::Request;
 
 #[cfg(not(test))]
-use log::{debug, error, warn, info};
+use log::{debug, error, info, warn};
 use tungstenite::protocol::WebSocketConfig;
 
-#[cfg(test)]
-use std::{println as debug, println as error, println as warn, println as info};
+use serde_json::from_slice;
 use std::io::Read;
 use std::net::TcpStream;
-use std::sync::{Arc, Mutex};
+#[cfg(test)]
+use std::{println as debug, println as error, println as warn, println as info};
 use tungstenite::{connect, stream::MaybeTlsStream, Message, WebSocket};
 use url::Url;
-use serde_json::from_slice;
-
 
 pub mod handlers;
 pub mod models;
@@ -134,8 +132,13 @@ impl RealtimeSession {
                         val
                     }
                     Err(err) => {
-                        warn!("Could not read value of message into RecognitionStarted struct, {:?}", err);
-                        models::RecognitionStarted::new(models::recognition_started::Message::RecognitionStarted)
+                        warn!(
+                            "Could not read value of message into RecognitionStarted struct, {:?}",
+                            err
+                        );
+                        models::RecognitionStarted::new(
+                            models::recognition_started::Message::RecognitionStarted,
+                        )
                     }
                 };
             } else {
@@ -176,7 +179,9 @@ impl RealtimeSession {
                     };
                     self.handlers.handle_event(msg, bin_data)?;
                 } else {
-                    error!("Something went wrong unpacking the message, the message value was None");
+                    error!(
+                        "Something went wrong unpacking the message, the message value was None"
+                    );
                 }
             };
             if !self.reader_empty {
@@ -212,7 +217,10 @@ pub struct SocketWrapper {
 
 impl SocketWrapper {
     fn new(socket: WebSocket<MaybeTlsStream<TcpStream>>) -> Self {
-        Self { socket, last_seq_no: 0 }
+        Self {
+            socket,
+            last_seq_no: 0,
+        }
     }
 
     fn send_message(&mut self, message: Message) -> Result<()> {
@@ -255,7 +263,10 @@ impl SocketWrapper {
     }
 
     pub fn send_close(&mut self) -> Result<()> {
-        let message = models::EndOfStream::new(self.last_seq_no, models::end_of_stream::Message::EndOfStream);
+        let message = models::EndOfStream::new(
+            self.last_seq_no,
+            models::end_of_stream::Message::EndOfStream,
+        );
         let serialised_msg = serde_json::to_string(&message)?;
         let tungstenite_msg = Message::from(serialised_msg);
         self.send_message(tungstenite_msg)
@@ -267,11 +278,11 @@ impl SocketWrapper {
             Err(e) => {
                 if let tungstenite::error::Error::Io(e) = &e {
                     if e.kind() == std::io::ErrorKind::WouldBlock {
-                        return Ok(None)
+                        return Ok(None);
                     }
                 }
                 error!("{:?}", e);
-                return Err(anyhow::Error::from(e))
+                return Err(anyhow::Error::from(e));
             }
         };
         Ok(mess)
@@ -300,14 +311,13 @@ pub(crate) use add_event_handler;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::realtime::handlers::Attach;
     use std::fs::File;
     use std::path::PathBuf;
-    use crate::realtime::handlers::Attach;
 
     #[test]
     fn test_basic_flow() {
-        let mut rt_session =
-            RealtimeSession::new("INSERT_API_KEY".to_owned(), None);
+        let mut rt_session = RealtimeSession::new("INSERT_API_KEY".to_owned(), None);
 
         let test_file_path = PathBuf::new()
             .join("..")
@@ -321,8 +331,11 @@ mod tests {
         let audio_config = models::AudioFormat::new(models::audio_format::Type::File);
         config.audio_format = Some(audio_config);
 
-        let closure: fn(models::AddTranscript) ->  () = |message: models::AddTranscript| {
-            println!("This is a test, you should see AddTranscript message logs in the terminal {:?}", message)
+        let closure: fn(models::AddTranscript) -> () = |message: models::AddTranscript| {
+            println!(
+                "This is a test, you should see AddTranscript message logs in the terminal {:?}",
+                message
+            )
         };
 
         add_event_handler!(&mut rt_session, handlers::AddTranscriptCallback, closure);
