@@ -30,7 +30,7 @@ impl ToString for JobType {
 
 impl Default for JobType {
     fn default() -> JobType {
-        Self::Alignment
+        Self::Transcription
     }
 }
 
