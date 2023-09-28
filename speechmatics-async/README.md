@@ -6,6 +6,11 @@ This crate is based on [tokio-tungstenite](https://docs.rs/tokio-tungstenite/lat
 
 ## Getting Started
 
+First things first, setting your desired feature flags. These options are:
+
+1. realtime - enables realtime features, causes tokio and tokio-tungstenite to be installed as dependencies
+2. batch - enabled batch features, causes reqwest and rand to be installed as dependencies
+
 After installing the package via cargo, a simple use case of transcribing a file might look like this:
 
 ```rs

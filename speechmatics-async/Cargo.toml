@@ -7,15 +7,19 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
-tokio-tungstenite = { version = "0.19.0", features = ["native-tls"] }
+tokio-tungstenite = { version = "0.19.0", features = ["native-tls"], optional = true }
 base64 = "0.21.4"
 futures = "0.3.28"
 futures-io = "0.3.28"
-http = "0.2.9"
+http = { version = "0.2.9", optional = true }
 log = "0.4.20"
-rand = "0.8.5"
+rand = { version = "0.8.5", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tokio = { version = "*", features = ["macros", "rt", "sync"] }
+tokio = { version = "*", features = ["macros", "rt", "sync"], optional = true }
 url = "2.4.1"
-reqwest = { version = "0.11.20", features = ["multipart", "stream", "json"] }
+reqwest = { version = "0.11.20", features = ["multipart", "stream", "json"], optional = true }
+
+[features]
+realtime = ["dep:tokio-tungstenite", "dep:tokio"]
+batch = ["dep:reqwest", "dep:rand", "dep:http"]

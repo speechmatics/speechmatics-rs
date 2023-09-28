@@ -353,8 +353,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_basic_flow() {
+        let api_key: String = std::env::var("SM_API_KEY").unwrap();
         let mut rt_session =
-            RealtimeSession::new("INSERT_KEY_HERE".to_owned(), None).unwrap();
+            RealtimeSession::new(api_key, None).unwrap();
 
         let test_file_path = PathBuf::new()
             .join("..")

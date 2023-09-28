@@ -64,7 +64,7 @@ impl BatchClient {
             .text("config", config_text);
 
         let res = self.client.post(url).multipart(form).send().await;
-        let result = res?.bytes().await?;
+        let result = res?.error_for_status()?.bytes().await?;
 
         let serde_res = serde_json::from_slice::<CreateJobResponse>(&result)?;
         Ok(serde_res)
@@ -74,7 +74,7 @@ impl BatchClient {
         let url = self.batch_url.join("jobs/")?.join(job_id)?;
 
         let res = self.client.get(url).send().await;
-        let result = res?.bytes().await?;
+        let result = res?.error_for_status()?.bytes().await?;
 
         let serde_res = serde_json::from_slice::<RetrieveJobResponse>(&result)?;
         Ok(serde_res)
@@ -98,7 +98,7 @@ impl BatchClient {
         }
 
         let res = self.client.get(url).query(&queries).send().await;
-        let result = res?.bytes().await?;
+        let result = res?.error_for_status()?.bytes().await?;
 
         let serde_res = serde_json::from_slice::<RetrieveJobsResponse>(&result)?;
         Ok(serde_res)
@@ -122,7 +122,7 @@ impl BatchClient {
         }
 
         let res = self.client.get(url).query(&queries).send().await;
-        let result = res?.bytes().await?;
+        let result = res?.error_for_status()?.bytes().await?;
 
         let serde_res = serde_json::from_slice::<RetrieveTranscriptResponse>(&result)?;
         Ok(serde_res)
@@ -138,7 +138,7 @@ impl BatchClient {
         }
 
         let res = self.client.delete(url).query(&queries).send().await;
-        let result = res?.bytes().await?;
+        let result = res?.error_for_status()?.bytes().await?;
 
         let serde_res = serde_json::from_slice::<DeleteJobResponse>(&result)?;
         Ok(serde_res)
@@ -149,6 +149,7 @@ impl BatchClient {
 mod tests {
     use super::*;
     use std::path::PathBuf;
+
 
     async fn submit_job_util(batch_client: &BatchClient) -> Result<CreateJobResponse> {
         let test_file_path = PathBuf::new()
@@ -167,52 +168,78 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_not_authorised() {
+        let batch_client = BatchClient::new("blah", None).unwrap();
+
+        let job_res = submit_job_util(&batch_client).await;
+        match job_res {
+            Ok(_) => assert!(false),
+            Err(err) => {
+                assert!(err.is::<reqwest::Error>())
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn test_submit_job_success() {
-        let batch_client = BatchClient::new("INSERT_API_KEY", None).unwrap();
+        let api_key: String = std::env::var("SM_API_KEY").unwrap();
+        let batch_client = BatchClient::new(&api_key, None).unwrap();
 
         let job_res = submit_job_util(&batch_client).await.unwrap();
-        println!("{:?}", job_res);
+        assert!(job_res.id != "")
     }
 
     #[tokio::test]
     async fn test_get_job() {
-        let batch_client = BatchClient::new("INSERT_API_KEY", None).unwrap();
+        let api_key: String = std::env::var("SM_API_KEY").unwrap();
+        let batch_client = BatchClient::new(&api_key, None).unwrap();
 
         let job_res = submit_job_util(&batch_client).await.unwrap();
         let get_job_res = batch_client.get_job(&job_res.id).await.unwrap();
-
-        println!("{:?}", get_job_res);
+        assert!(get_job_res.job.data_name != "");
+        if let Some(dur) = get_job_res.job.duration {
+            assert!(dur > 0);
+        } else {
+            assert!(false)
+        }
     }
 
     #[tokio::test]
     async fn test_get_jobs() {
-        let batch_client = BatchClient::new("INSERT_API_KEY", None).unwrap();
+        let api_key: String = std::env::var("SM_API_KEY").unwrap();
+        let batch_client = BatchClient::new(&api_key, None).unwrap();
 
+        let _ = submit_job_util(&batch_client).await.unwrap();
+        let _ = submit_job_util(&batch_client).await.unwrap();
+        let _ = submit_job_util(&batch_client).await.unwrap();
         let job_res = batch_client.get_jobs(Some(2), None).await.unwrap();
-        println!("{:?}", job_res);
+        assert!(job_res.jobs.len() == 2)
     }
 
     #[tokio::test]
     async fn test_get_result() {
-        let batch_client = BatchClient::new("INSERT_API_KEY", None).unwrap();
+        let api_key: String = std::env::var("SM_API_KEY").unwrap();
+        let batch_client = BatchClient::new(&api_key, None).unwrap();
 
         let job_res = submit_job_util(&batch_client).await.unwrap();
         let get_result_res = batch_client
             .get_result(&job_res.id, Some("json-v2"))
             .await
             .unwrap();
-        println!("{:?}", get_result_res);
+        assert!(get_result_res.format == "json-v2");
+        assert!(get_result_res.results.len() != 0)
     }
 
     #[tokio::test]
     async fn test_delete_job() {
-        let batch_client = BatchClient::new("INSERT_API_KEY", None).unwrap();
+        let api_key: String = std::env::var("SM_API_KEY").unwrap();
+        let batch_client = BatchClient::new(&api_key, None).unwrap();
 
         let job_res = submit_job_util(&batch_client).await.unwrap();
         let delete_res = batch_client
             .delete_job(&job_res.id, Some(true))
             .await
             .unwrap();
-        println!("{:?}", delete_res);
+        assert!(delete_res.job.status == models::job_details::Status::Deleted);
     }
 }
