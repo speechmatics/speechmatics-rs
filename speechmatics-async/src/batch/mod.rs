@@ -47,7 +47,7 @@ impl BatchClient {
         file_path: std::path::PathBuf,
     ) -> Result<CreateJobResponse> {
         let url = self.batch_url.join("jobs")?;
-        let file = fs::read(&file_path).unwrap();
+        let file = fs::read(&file_path)?;
         let config_text = serde_json::to_string(&config)?;
 
         let mut file_name: String = "".to_owned();
