@@ -104,10 +104,9 @@ impl BatchClient {
         Ok(serde_res)
     }
 
-    pub async fn get_result(
+    pub async fn get_json_result(
         &self,
         job_id: &str,
-        format: Option<&str>,
     ) -> Result<RetrieveTranscriptResponse> {
         let url = self
             .batch_url
@@ -117,14 +116,54 @@ impl BatchClient {
 
         let mut queries = self.default_query.clone();
 
-        if let Some(form) = format {
-            queries.push(("format".to_owned(), form.to_owned()))
-        }
+        queries.push(("format".to_owned(), "json-v2".to_owned()));
 
         let res = self.client.get(url).query(&queries).send().await;
         let result = res?.error_for_status()?.bytes().await?;
 
         let serde_res = serde_json::from_slice::<RetrieveTranscriptResponse>(&result)?;
+        Ok(serde_res)
+    }
+
+    pub async fn get_text_result(
+        &self,
+        job_id: &str,
+    ) -> Result<String> {
+        let url = self
+            .batch_url
+            .join("jobs/")?
+            .join(&format!("{}/", job_id))?
+            .join("transcript")?;
+
+        let mut queries = self.default_query.clone();
+
+        queries.push(("format".to_owned(), "txt".to_owned()));
+
+        let res = self.client.get(url).query(&queries).send().await;
+        let result = res?.error_for_status()?.bytes().await?;
+
+        let serde_res = serde_json::from_slice::<String>(&result)?;
+        Ok(serde_res)
+    }
+
+    pub async fn get_srt_result(
+        &self,
+        job_id: &str,
+    ) -> Result<String> {
+        let url = self
+            .batch_url
+            .join("jobs/")?
+            .join(&format!("{}/", job_id))?
+            .join("transcript")?;
+
+        let mut queries = self.default_query.clone();
+
+        queries.push(("format".to_owned(), "srt".to_owned()));
+
+        let res = self.client.get(url).query(&queries).send().await;
+        let result = res?.error_for_status()?.bytes().await?;
+
+        let serde_res = serde_json::from_slice::<String>(&result)?;
         Ok(serde_res)
     }
 
@@ -149,7 +188,6 @@ impl BatchClient {
 mod tests {
     use super::*;
     use std::path::PathBuf;
-
 
     async fn submit_job_util(batch_client: &BatchClient) -> Result<CreateJobResponse> {
         let test_file_path = PathBuf::new()
@@ -217,17 +255,63 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_result() {
+    async fn test_get_json_result() {
         let api_key: String = std::env::var("SM_API_KEY").unwrap();
         let batch_client = BatchClient::new(&api_key, None).unwrap();
 
         let job_res = submit_job_util(&batch_client).await.unwrap();
+        let mut success = false;
+        let mut retries = 0;
+        while !success {
+            let get_job_res = batch_client.get_job(&job_res.id).await.unwrap();
+            if get_job_res.job.status == models::job_details::Status::Done {
+                success = true
+            } else if get_job_res.job.status != models::job_details::Status::Running {
+                panic!("Job failed");
+            } else {
+                if retries > 6 {
+                    panic!("Job took too long to complete");
+                }
+                retries += 1;
+                std::thread::sleep(std::time::Duration::from_millis(3000));
+            }
+        }
         let get_result_res = batch_client
-            .get_result(&job_res.id, Some("json-v2"))
+            .get_json_result(&job_res.id)
             .await
             .unwrap();
-        assert!(get_result_res.format == "json-v2");
+        println!("{:?}", get_result_res);
+        assert!(get_result_res.job.data_name == "example.wav");
         assert!(get_result_res.results.len() != 0)
+    }
+
+    #[tokio::test]
+    async fn test_get_text_result() {
+        let api_key: String = std::env::var("SM_API_KEY").unwrap();
+        let batch_client = BatchClient::new(&api_key, None).unwrap();
+
+        let job_res = submit_job_util(&batch_client).await.unwrap();
+        let mut success = false;
+        let mut retries = 0;
+        while !success {
+            let get_job_res = batch_client.get_job(&job_res.id).await.unwrap();
+            if get_job_res.job.status == models::job_details::Status::Done {
+                success = true
+            } else if get_job_res.job.status != models::job_details::Status::Running {
+                panic!("Job failed");
+            } else {
+                if retries > 6 {
+                    panic!("Job took too long to complete");
+                }
+                retries += 1;
+                std::thread::sleep(std::time::Duration::from_millis(3000));
+            }
+        }
+        let get_result_res = batch_client
+            .get_text_result(&job_res.id)
+            .await
+            .unwrap();
+        assert!(get_result_res.len() != 0)
     }
 
     #[tokio::test]
