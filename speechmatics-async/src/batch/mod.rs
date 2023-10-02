@@ -1,3 +1,5 @@
+//! The main entry point for the batch jobs API. Provides a struct which wraps a client and comes with associated API methods.
+
 use anyhow::Result;
 use models::*;
 use reqwest::{
@@ -8,11 +10,16 @@ use reqwest::{
 use std::fs;
 use url::Url;
 
+#[allow(unknown_lints)]
+#[allow(clippy::all)]
 pub mod models;
 
 pub const DEFAULT_BATCH_URL: &str = "https://asr.api.speechmatics.com/v2/";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// BatchClient - batch client is the main wrapper for making batch requests.
+/// It holds the url in question along with the client object.
+/// None of its properties are public.
 pub struct BatchClient {
     batch_url: Url,
     client: Client,
@@ -20,6 +27,7 @@ pub struct BatchClient {
 }
 
 impl BatchClient {
+    /// new - instantiate a 
     pub fn new(api_key: &str, batch_url: Option<url::Url>) -> Result<Self> {
         let mut headers = HeaderMap::new();
 
@@ -220,7 +228,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_submit_job_success() {
-        let api_key: String = std::env::var("SM_API_KEY").unwrap();
+        let api_key: String = std::env::var("API_KEY").unwrap();
         let batch_client = BatchClient::new(&api_key, None).unwrap();
 
         let job_res = submit_job_util(&batch_client).await.unwrap();
@@ -229,7 +237,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_job() {
-        let api_key: String = std::env::var("SM_API_KEY").unwrap();
+        let api_key: String = std::env::var("API_KEY").unwrap();
         let batch_client = BatchClient::new(&api_key, None).unwrap();
 
         let job_res = submit_job_util(&batch_client).await.unwrap();
@@ -244,7 +252,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_jobs() {
-        let api_key: String = std::env::var("SM_API_KEY").unwrap();
+        let api_key: String = std::env::var("API_KEY").unwrap();
         let batch_client = BatchClient::new(&api_key, None).unwrap();
 
         let _ = submit_job_util(&batch_client).await.unwrap();
@@ -256,7 +264,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_json_result() {
-        let api_key: String = std::env::var("SM_API_KEY").unwrap();
+        let api_key: String = std::env::var("API_KEY").unwrap();
         let batch_client = BatchClient::new(&api_key, None).unwrap();
 
         let job_res = submit_job_util(&batch_client).await.unwrap();
@@ -287,7 +295,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_text_result() {
-        let api_key: String = std::env::var("SM_API_KEY").unwrap();
+        let api_key: String = std::env::var("API_KEY").unwrap();
         let batch_client = BatchClient::new(&api_key, None).unwrap();
 
         let job_res = submit_job_util(&batch_client).await.unwrap();
@@ -316,7 +324,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_job() {
-        let api_key: String = std::env::var("SM_API_KEY").unwrap();
+        let api_key: String = std::env::var("API_KEY").unwrap();
         let batch_client = BatchClient::new(&api_key, None).unwrap();
 
         let job_res = submit_job_util(&batch_client).await.unwrap();

@@ -48,7 +48,7 @@ fn main() {
         })
     }
 
-    add_event_handler!(&mut rt_session, handlers::AddTranscriptCallback, closure);
+    add_event_handler!(&mut rt_session, handlers::AddTranscriptHandler, closure);
 
     rt_session.run(config, file).await.unwrap();
 }

@@ -11,56 +11,56 @@ pub trait Attach {
     fn attach(&self, handlers: &mut EventHandlers);
 }
 
-pub type ErrorCallback = fn(models::Error) -> Pin<Box<dyn Future<Output = ()>>>;
-impl Attach for ErrorCallback {
+pub type ErrorHandler = fn(models::Error) -> Pin<Box<dyn Future<Output = ()>>>;
+impl Attach for ErrorHandler {
     fn attach(&self, handlers: &mut EventHandlers) {
         handlers.handle_error = Some(*self);
     }
 }
-pub type InfoCallback = fn(models::Info) -> Pin<Box<dyn Future<Output = ()>>>;
-impl Attach for InfoCallback {
+pub type InfoHandler = fn(models::Info) -> Pin<Box<dyn Future<Output = ()>>>;
+impl Attach for InfoHandler {
     fn attach(&self, handlers: &mut EventHandlers) {
         handlers.handle_info = Some(*self);
     }
 }
-pub type WarningCallback = fn(models::Warning) -> Pin<Box<dyn Future<Output = ()>>>;
-impl Attach for WarningCallback {
+pub type WarningHandler = fn(models::Warning) -> Pin<Box<dyn Future<Output = ()>>>;
+impl Attach for WarningHandler {
     fn attach(&self, handlers: &mut EventHandlers) {
         handlers.handle_warning = Some(*self);
     }
 }
-pub type RecognitionStartedCallback = fn(models::RecognitionStarted) -> Pin<Box<dyn Future<Output = ()>>>;
-impl Attach for RecognitionStartedCallback {
+pub type RecognitionStartedHandler = fn(models::RecognitionStarted) -> Pin<Box<dyn Future<Output = ()>>>;
+impl Attach for RecognitionStartedHandler {
     fn attach(&self, handlers: &mut EventHandlers) {
         handlers.handle_recognition_started = Some(*self);
     }
 }
-pub type AddTranscriptCallback = fn(models::AddTranscript) -> Pin<Box<dyn Future<Output = ()>>>;
-impl Attach for AddTranscriptCallback {
+pub type AddTranscriptHandler = fn(models::AddTranscript) -> Pin<Box<dyn Future<Output = ()>>>;
+impl Attach for AddTranscriptHandler {
     fn attach(&self, handlers: &mut EventHandlers) {
         handlers.handle_add_transcript = Some(*self);
     }
 }
-pub type AddPartialTranscriptCallback = fn(models::AddPartialTranscript) -> Pin<Box<dyn Future<Output = ()>>>;
-impl Attach for AddPartialTranscriptCallback {
+pub type AddPartialTranscriptHandler = fn(models::AddPartialTranscript) -> Pin<Box<dyn Future<Output = ()>>>;
+impl Attach for AddPartialTranscriptHandler {
     fn attach(&self, handlers: &mut EventHandlers) {
         handlers.handle_add_partial_transcript = Some(*self);
     }
 }
-pub type AddTranslationCallback = fn(models::AddTranslation) -> Pin<Box<dyn Future<Output = ()>>>;
-impl Attach for AddTranslationCallback {
+pub type AddTranslationHandler = fn(models::AddTranslation) -> Pin<Box<dyn Future<Output = ()>>>;
+impl Attach for AddTranslationHandler {
     fn attach(&self, handlers: &mut EventHandlers) {
         handlers.handle_add_translation = Some(*self);
     }
 }
-pub type AddPartialTranslationCallback = fn(models::AddPartialTranslation) -> Pin<Box<dyn Future<Output = ()>>>;
-impl Attach for AddPartialTranslationCallback {
+pub type AddPartialTranslationHandler = fn(models::AddPartialTranslation) -> Pin<Box<dyn Future<Output = ()>>>;
+impl Attach for AddPartialTranslationHandler {
     fn attach(&self, handlers: &mut EventHandlers) {
         handlers.handle_add_partial_translation = Some(*self);
     }
 }
-pub type AudioAddedCallback = fn(models::AudioAdded) -> Pin<Box<dyn Future<Output = ()>>>;
-impl Attach for AudioAddedCallback {
+pub type AudioAddedHandler = fn(models::AudioAdded) -> Pin<Box<dyn Future<Output = ()>>>;
+impl Attach for AudioAddedHandler {
     fn attach(&self, handlers: &mut EventHandlers) {
         handlers.handle_audio_added = Some(*self);
     }
