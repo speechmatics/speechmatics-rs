@@ -14,19 +14,20 @@ First things first, setting your desired feature flags. These options are:
 After installing the package via cargo, a simple use case of transcribing a file might look like this:
 
 ```rs
-use speechmatics_async::realtime::*;
+use futures::Future;
+use speechmatics_async::{
+    add_event_handler,
+    realtime::{handlers, models, RealtimeSession, SessionConfig},
+};
 use std::fs::File;
 use std::path::PathBuf;
-use speechmatics_async::realtime::handlers::Attach;
-use std::println;
-use std::box::Box;
-use futures::Future;
+use std::pin::Pin;
 use tokio;
 
 #[tokio::main]
-fn main() {
-    let mut rt_session =
-        RealtimeSession::new("INSERT_KEY_HERE".to_owned(), None).unwrap();
+async fn main() {
+    let api_key: String = std::env::var("API_KEY").unwrap();
+    let mut rt_session = RealtimeSession::new(api_key, None).unwrap();
 
     let test_file_path = PathBuf::new()
         .join("..")
@@ -37,15 +38,11 @@ fn main() {
     let file = File::open(test_file_path).unwrap();
 
     let mut config: SessionConfig = Default::default();
-    let audio_config = models::AudioFormat::new(models::audio_format::RHashType::File);
+    let audio_config = models::AudioFormat::new(models::audio_format::Type::File);
     config.audio_format = Some(audio_config);
 
-    // Note that because this performs dynamic dispatch, the Future must be put inside a pinned box
-    fn closure(input: models::AddTranscript) -> Pin<Box<dyn Future<Output = ()>>>  {
-        Box::pin(async move {
-            // This is obviously not async, but you should get the idea. You can await any async code in this block
-            println!("{:?}", input)
-        })
+    fn closure(input: models::AddTranscript) -> Pin<Box<dyn Future<Output = ()>>> {
+        Box::pin(async move { println!("{:?}", input) })
     }
 
     add_event_handler!(&mut rt_session, handlers::AddTranscriptHandler, closure);
