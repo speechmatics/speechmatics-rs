@@ -1,4 +1,3 @@
-
 use anyhow::Result;
 use futures::Future;
 use log::debug;
@@ -7,58 +6,71 @@ use std::pin::Pin;
 
 use crate::realtime::models;
 
+#[doc(hidden)]
 pub trait Attach {
     fn attach(&self, handlers: &mut EventHandlers);
 }
 
+/// Type alias for functions handling error events from the server
 pub type ErrorHandler = fn(models::Error) -> Pin<Box<dyn Future<Output = ()>>>;
 impl Attach for ErrorHandler {
     fn attach(&self, handlers: &mut EventHandlers) {
         handlers.handle_error = Some(*self);
     }
 }
+/// Type alias for functions handling info events from the server
 pub type InfoHandler = fn(models::Info) -> Pin<Box<dyn Future<Output = ()>>>;
 impl Attach for InfoHandler {
     fn attach(&self, handlers: &mut EventHandlers) {
         handlers.handle_info = Some(*self);
     }
 }
+/// Type alias for functions handling warning events from the server
 pub type WarningHandler = fn(models::Warning) -> Pin<Box<dyn Future<Output = ()>>>;
 impl Attach for WarningHandler {
     fn attach(&self, handlers: &mut EventHandlers) {
         handlers.handle_warning = Some(*self);
     }
 }
-pub type RecognitionStartedHandler = fn(models::RecognitionStarted) -> Pin<Box<dyn Future<Output = ()>>>;
+/// Type alias for functions handling recognition started events from the server
+pub type RecognitionStartedHandler =
+    fn(models::RecognitionStarted) -> Pin<Box<dyn Future<Output = ()>>>;
 impl Attach for RecognitionStartedHandler {
     fn attach(&self, handlers: &mut EventHandlers) {
         handlers.handle_recognition_started = Some(*self);
     }
 }
+/// Type alias for functions handling add transcript events from the server
 pub type AddTranscriptHandler = fn(models::AddTranscript) -> Pin<Box<dyn Future<Output = ()>>>;
 impl Attach for AddTranscriptHandler {
     fn attach(&self, handlers: &mut EventHandlers) {
         handlers.handle_add_transcript = Some(*self);
     }
 }
-pub type AddPartialTranscriptHandler = fn(models::AddPartialTranscript) -> Pin<Box<dyn Future<Output = ()>>>;
+/// Type alias for functions handling add partial transcript events from the server
+pub type AddPartialTranscriptHandler =
+    fn(models::AddPartialTranscript) -> Pin<Box<dyn Future<Output = ()>>>;
 impl Attach for AddPartialTranscriptHandler {
     fn attach(&self, handlers: &mut EventHandlers) {
         handlers.handle_add_partial_transcript = Some(*self);
     }
 }
+/// Type alias for functions handling add translation events from the server
 pub type AddTranslationHandler = fn(models::AddTranslation) -> Pin<Box<dyn Future<Output = ()>>>;
 impl Attach for AddTranslationHandler {
     fn attach(&self, handlers: &mut EventHandlers) {
         handlers.handle_add_translation = Some(*self);
     }
 }
-pub type AddPartialTranslationHandler = fn(models::AddPartialTranslation) -> Pin<Box<dyn Future<Output = ()>>>;
+/// Type alias for functions handling add partial translation events from the server
+pub type AddPartialTranslationHandler =
+    fn(models::AddPartialTranslation) -> Pin<Box<dyn Future<Output = ()>>>;
 impl Attach for AddPartialTranslationHandler {
     fn attach(&self, handlers: &mut EventHandlers) {
         handlers.handle_add_partial_translation = Some(*self);
     }
 }
+/// Type alias for functions handling audio added events from the server
 pub type AudioAddedHandler = fn(models::AudioAdded) -> Pin<Box<dyn Future<Output = ()>>>;
 impl Attach for AudioAddedHandler {
     fn attach(&self, handlers: &mut EventHandlers) {
@@ -66,26 +78,39 @@ impl Attach for AudioAddedHandler {
     }
 }
 
+/// Struct that holds all the event handlers for the various server events
 #[derive(Clone, Copy)]
+#[doc(hidden)]
 pub struct EventHandlers {
-    handle_error: Option<fn(models::Error) -> Pin<Box<(dyn futures::Future<Output = ()> + 'static)>>>,
+    handle_error:
+        Option<fn(models::Error) -> Pin<Box<(dyn futures::Future<Output = ()> + 'static)>>>,
     handle_info: Option<fn(models::Info) -> Pin<Box<(dyn futures::Future<Output = ()> + 'static)>>>,
-    handle_warning: Option<fn(models::Warning) -> Pin<Box<(dyn futures::Future<Output = ()> + 'static)>>>,
-    handle_recognition_started:
-        Option<fn(models::RecognitionStarted) -> Pin<Box<(dyn futures::Future<Output = ()> + 'static)>>>,
-    handle_add_transcript: Option<fn(models::AddTranscript) -> Pin<Box<(dyn futures::Future<Output = ()> + 'static)>>>,
-    handle_add_partial_transcript:
-        Option<fn(models::AddPartialTranscript) -> Pin<Box<(dyn futures::Future<Output = ()> + 'static)>>>,
-    handle_add_translation: Option<fn(models::AddTranslation) -> Pin<Box<(dyn futures::Future<Output = ()> + 'static)>>>,
-    handle_add_partial_translation:
-        Option<fn(models::AddPartialTranslation) -> Pin<Box<(dyn futures::Future<Output = ()> + 'static)>>>,
-    handle_audio_added: Option<fn(models::AudioAdded) -> Pin<Box<(dyn futures::Future<Output = ()> + 'static)>>>,
-    handle_end_of_transcript:
-        Option<fn(models::EndOfTranscript) -> Pin<Box<(dyn futures::Future<Output = ()> + 'static)>>>,
+    handle_warning:
+        Option<fn(models::Warning) -> Pin<Box<(dyn futures::Future<Output = ()> + 'static)>>>,
+    handle_recognition_started: Option<
+        fn(models::RecognitionStarted) -> Pin<Box<(dyn futures::Future<Output = ()> + 'static)>>,
+    >,
+    handle_add_transcript:
+        Option<fn(models::AddTranscript) -> Pin<Box<(dyn futures::Future<Output = ()> + 'static)>>>,
+    handle_add_partial_transcript: Option<
+        fn(models::AddPartialTranscript) -> Pin<Box<(dyn futures::Future<Output = ()> + 'static)>>,
+    >,
+    handle_add_translation: Option<
+        fn(models::AddTranslation) -> Pin<Box<(dyn futures::Future<Output = ()> + 'static)>>,
+    >,
+    handle_add_partial_translation: Option<
+        fn(models::AddPartialTranslation) -> Pin<Box<(dyn futures::Future<Output = ()> + 'static)>>,
+    >,
+    handle_audio_added:
+        Option<fn(models::AudioAdded) -> Pin<Box<(dyn futures::Future<Output = ()> + 'static)>>>,
+    handle_end_of_transcript: Option<
+        fn(models::EndOfTranscript) -> Pin<Box<(dyn futures::Future<Output = ()> + 'static)>>,
+    >,
 }
 
 impl EventHandlers {
-    pub fn new() -> Self {
+    #[doc(hidden)]
+    pub(super) fn new() -> Self {
         Self {
             handle_error: None,
             handle_info: None,
@@ -100,7 +125,12 @@ impl EventHandlers {
         }
     }
 
-    pub async fn handle_event(&mut self, event: models::Messages, data: Vec<u8>) -> Result<()> {
+    #[doc(hidden)]
+    pub(super) async fn handle_event(
+        &mut self,
+        event: models::Messages,
+        data: Vec<u8>,
+    ) -> Result<()> {
         match event {
             super::models::Messages::Error => {
                 if let Some(handle_error) = &self.handle_error {

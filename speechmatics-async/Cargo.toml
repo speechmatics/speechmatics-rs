@@ -16,10 +16,18 @@ log = "0.4.20"
 rand = { version = "0.8.5", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tokio = { version = "*", features = ["macros", "rt", "sync"], optional = true }
+tokio = { version = "*", features = ["macros", "rt", "sync", "rt-multi-thread"], optional = true }
 url = "2.4.1"
 reqwest = { version = "0.11.20", features = ["multipart", "stream", "json"], optional = true }
 
 [features]
 realtime = ["dep:tokio-tungstenite", "dep:tokio"]
 batch = ["dep:reqwest", "dep:rand", "dep:http"]
+
+[[example]]
+name = "basic-realtime"
+path = "examples/basic-realtime.rs"
+
+[[example]]
+name = "batch-job-lifecycle"
+path = "examples/batch-job-lifecycle.rs"

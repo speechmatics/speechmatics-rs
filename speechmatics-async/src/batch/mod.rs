@@ -10,8 +10,7 @@ use reqwest::{
 use std::fs;
 use url::Url;
 
-#[allow(unknown_lints)]
-#[allow(clippy::all)]
+#[allow(missing_docs)]
 pub mod models;
 
 pub const DEFAULT_BATCH_URL: &str = "https://asr.api.speechmatics.com/v2/";
@@ -27,7 +26,7 @@ pub struct BatchClient {
 }
 
 impl BatchClient {
-    /// new - instantiate a 
+    /// new - instantiate a
     pub fn new(api_key: &str, batch_url: Option<url::Url>) -> Result<Self> {
         let mut headers = HeaderMap::new();
 
@@ -112,10 +111,7 @@ impl BatchClient {
         Ok(serde_res)
     }
 
-    pub async fn get_json_result(
-        &self,
-        job_id: &str,
-    ) -> Result<RetrieveTranscriptResponse> {
+    pub async fn get_json_result(&self, job_id: &str) -> Result<RetrieveTranscriptResponse> {
         let url = self
             .batch_url
             .join("jobs/")?
@@ -133,10 +129,7 @@ impl BatchClient {
         Ok(serde_res)
     }
 
-    pub async fn get_text_result(
-        &self,
-        job_id: &str,
-    ) -> Result<String> {
+    pub async fn get_text_result(&self, job_id: &str) -> Result<String> {
         let url = self
             .batch_url
             .join("jobs/")?
@@ -154,10 +147,7 @@ impl BatchClient {
         Ok(serde_res)
     }
 
-    pub async fn get_srt_result(
-        &self,
-        job_id: &str,
-    ) -> Result<String> {
+    pub async fn get_srt_result(&self, job_id: &str) -> Result<String> {
         let url = self
             .batch_url
             .join("jobs/")?
@@ -284,10 +274,7 @@ mod tests {
                 std::thread::sleep(std::time::Duration::from_millis(3000));
             }
         }
-        let get_result_res = batch_client
-            .get_json_result(&job_res.id)
-            .await
-            .unwrap();
+        let get_result_res = batch_client.get_json_result(&job_res.id).await.unwrap();
         println!("{:?}", get_result_res);
         assert!(get_result_res.job.data_name == "example.wav");
         assert!(get_result_res.results.len() != 0)
@@ -315,10 +302,7 @@ mod tests {
                 std::thread::sleep(std::time::Duration::from_millis(3000));
             }
         }
-        let get_result_res = batch_client
-            .get_text_result(&job_res.id)
-            .await
-            .unwrap();
+        let get_result_res = batch_client.get_text_result(&job_res.id).await.unwrap();
         assert!(get_result_res.len() != 0)
     }
 

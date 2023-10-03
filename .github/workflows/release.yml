@@ -22,5 +22,6 @@ jobs:
           override: true
 
       - run: cargo publish --token ${CRATES_TOKEN}
+        working-directory: ./speechmatics-async
         env:
           CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
