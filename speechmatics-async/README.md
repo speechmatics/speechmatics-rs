@@ -2,7 +2,7 @@
 
 **IMPORTANT: This is a work in progress, the API is subject to significant change and much of the error handling is currently lacking. We hope to eventually get this code to a production state, but for now it should serve as a guide to what a rust implementation could look like.**
 
-This crate is based on [tokio-tungstenite](https://docs.rs/tokio-tungstenite/latest/tokio_tungstenite/), and should fit nicely into your async rust stack to allow you to run realtime transcription tasks asynchronously alongside other tasks.
+This crate is based on [tokio-tungstenite](https://docs.rs/tokio-tungstenite/latest/tokio_tungstenite/) for realtime and [reqwest](https://docs.rs/reqwest/latest/reqwest/), and should fit nicely into your async rust stack to allow you to run transcription tasks asynchronously alongside other tasks.
 
 ## Getting Started
 
@@ -11,7 +11,9 @@ First things first, setting your desired feature flags. These options are:
 1. realtime - enables realtime features, causes tokio and tokio-tungstenite to be installed as dependencies
 2. batch - enabled batch features, causes reqwest and rand to be installed as dependencies
 
-After installing the package via cargo, a simple use case of transcribing a file might look like this:
+## Transcribing In Realtime
+
+To transcribe in realtime, you'll need to install the futures, tokio and speechmatics_async crates. Then you can run the following code in your main.rs file.  Don't forget to update the API key and file path.
 
 ```rs
 use futures::Future;
@@ -50,3 +52,67 @@ async fn main() {
     rt_session.run(config, file).await.unwrap();
 }
 ```
+
+## Transcribing With Batch
+
+To transcribe in batch, you'll need to install the an async runtime of your choice. Here, we're using tokio for consistency's sake. Then the following code can be added to your main.rs file and run. Don't forget to update the API key and file path.
+
+```rs
+use speechmatics_async::batch::{
+    models::{self, JobConfig, TranscriptionConfig},
+    BatchClient,
+};
+use std::path::PathBuf;
+use tokio;
+
+#[tokio::main]
+async fn main() {
+    // instantiate the client
+    let api_key: String = std::env::var("API_KEY").unwrap();
+    let batch_client = BatchClient::new(&api_key, None).unwrap();
+
+    // set up the path to the file and load in the config
+    let test_file_path = PathBuf::new()
+        .join("..")
+        .join("tests")
+        .join("data")
+        .join("example.wav");
+
+    let mut config = JobConfig::default();
+    let mut transcription_config = TranscriptionConfig::default();
+    transcription_config.language = "en".to_owned();
+    config.transcription_config = Some(Box::new(transcription_config));
+
+    // submit the job
+    let job_res = batch_client
+        .submit_job(config, test_file_path)
+        .await
+        .unwrap();
+
+    // wait for the job to return a completed status, or to enter an error status in which case panic
+    let mut success = false;
+    let mut retries = 0;
+    while !success {
+        let get_job_res = batch_client.get_job(&job_res.id).await.unwrap();
+        if get_job_res.job.status == models::job_details::Status::Done {
+            success = true
+        } else if get_job_res.job.status != models::job_details::Status::Running {
+            panic!("Job failed");
+        } else {
+            if retries > 6 {
+                panic!("Job took too long to complete");
+            }
+            retries += 1;
+            std::thread::sleep(std::time::Duration::from_millis(3000));
+        }
+    }
+
+    // get the json transcript of the job
+    let get_result_res = batch_client.get_json_result(&job_res.id).await.unwrap();
+    println!("{:?}", get_result_res);
+}
+```
+
+## Examples
+
+You can find examples of the code in the [examples folder](./examples/). They are mostly a rehash of the code snippets in this file - because our API is just that simple!
