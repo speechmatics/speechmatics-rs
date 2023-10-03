@@ -1,3 +1,5 @@
+//! The main entry point for the batch jobs API. Provides a struct which wraps a client and comes with associated API methods.
+
 use anyhow::Result;
 use models::*;
 use reqwest::{
@@ -8,11 +10,20 @@ use reqwest::{
 use std::fs;
 use url::Url;
 
+#[allow(missing_docs)]
 pub mod models;
 
+/// The default URL for the batch runtime.
+///
+/// This is the standard URL for self-service customers, and some enterprise customers.
+/// Some customers may wish instead to access other European, American or Australian environments.
+/// A full list of URLs can be found in our [docs](https://docs.speechmatics.com/introduction/authentication#supported-endpoints).
 pub const DEFAULT_BATCH_URL: &str = "https://asr.api.speechmatics.com/v2/";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// BatchClient - batch client is the main wrapper for making batch requests.
+/// It holds the url in question along with the client object.
+/// None of its properties are public.
 pub struct BatchClient {
     batch_url: Url,
     client: Client,
@@ -20,6 +31,7 @@ pub struct BatchClient {
 }
 
 impl BatchClient {
+    /// Instantiates a new batch client. Parses the provided URL or use the defaults
     pub fn new(api_key: &str, batch_url: Option<url::Url>) -> Result<Self> {
         let mut headers = HeaderMap::new();
 
@@ -41,6 +53,42 @@ impl BatchClient {
         })
     }
 
+    /// Submits a job to the batch jobs API based on a path to a file.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use std::path::PathBuf;
+    /// use std::box::Box;
+    /// use speechmatics_async::batch::{
+    ///     BatchClient,
+    ///     models::{JobConfig, TranscriptionConfig}
+    /// };
+    /// 
+    /// let batch_client = BatchClient::new("API_KEY", None).unwrap();
+    /// 
+    /// let test_file_path = PathBuf::new()
+    ///     .join("..")
+    ///     .join("tests")
+    ///     .join("data")
+    ///     .join("example.wav");
+    ///
+    /// let mut config = JobConfig::default();
+    /// let mut transcription_config = TranscriptionConfig::default();
+    /// transcription_config.language = "en".to_owned();
+    /// config.transcription_config = Some(Box::new(transcription_config));
+    /// 
+    /// let job_res = batch_client.submit_job(config, test_file_path).await.unwrap();
+    /// ```
+    /// 
+    /// # Errors
+    /// 
+    /// The following error states are possible:
+    ///     - If the file can't be read (e.g. it doesn't exist)
+    ///     - If there is an issue converting the file path to a file name string
+    ///     - If there is an error in the API, which could be any standard HTTP error code
+    ///     - If the response cannot be parsed from bytes into the correct struct
+    /// 
     pub async fn submit_job(
         &self,
         config: JobConfig,
@@ -70,6 +118,22 @@ impl BatchClient {
         Ok(serde_res)
     }
 
+    /// Get details for a batch job. This includes the job config, metadata and status, but does NOT include the result.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use speechmatics_async::batch::BatchClient;
+    /// 
+    /// let batch_client = BatchClient::new("API_KEY", None).unwrap();
+    /// let get_job_res = batch_client.get_job("JOB_ID").await.unwrap();
+    /// ```
+    /// 
+    /// # Errors
+    /// 
+    /// This function can error with the usual HTTP status code errors.
+    /// It will also error if it fails to parse the output for whatever reason.
+    /// 
     pub async fn get_job(&self, job_id: &str) -> Result<RetrieveJobResponse> {
         let url = self.batch_url.join("jobs/")?.join(job_id)?;
 
@@ -80,6 +144,32 @@ impl BatchClient {
         Ok(serde_res)
     }
 
+
+    /// Get a list of jobs. This includes the job config, redacted metadata and status, but does NOT include the result.
+    /// 
+    /// Setting the limit allows controlling the number of jobs returned.
+    /// If no limit is set, the jobs' blob data (i.e. audio) will also be returned.
+    /// 
+    /// Setting include_deleted determines whether to return jobs with a status of deleted. The default is false.
+    /// Deleted jobs have most of their metadata wiped.
+    /// 
+    /// Setting created_before sets the date as a cursor. This allows searching results in a paginated way.
+    /// This only works in conjunction with the limit parameter.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use speechmatics_async::batch::BatchClient;
+    /// 
+    /// let batch_client = BatchClient::new("API_KEY", None).unwrap();
+    /// let jobs = batch_client.get_jobs(Some(5), Some(true)).await.unwrap();
+    /// ```
+    /// 
+    /// # Errors
+    /// 
+    /// This function can error with the usual HTTP status code errors.
+    /// It will also error if it fails to parse the server response for whatever reason.
+    /// 
     pub async fn get_jobs(
         &self,
         limit: Option<i32>,
@@ -104,10 +194,30 @@ impl BatchClient {
         Ok(serde_res)
     }
 
-    pub async fn get_json_result(
-        &self,
-        job_id: &str,
-    ) -> Result<RetrieveTranscriptResponse> {
+    /// Gets the json-formatted result of a batch job.
+    /// This will include all the requested results (e.g. transcript, translation, summary) as well as config and metadata.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use std::println;
+    /// use speechmatics_async::batch::BatchClient;
+    /// 
+    /// let batch_client = BatchClient::new("API_KEY", None).unwrap();
+    /// let get_result_res = batch_client.get_json_result("JOB_ID").await.unwrap();
+    /// println!("{:?}", get_result_res);
+    /// ```
+    /// 
+    /// # Errors
+    /// 
+    /// This function can error with the usual HTTP status code errors.
+    /// It will also error if it fails to parse the server response for whatever reason.
+    /// 
+    /// A common failure state occurs when requesting a result for an incomplete job.
+    /// To this end, you should implement polling based on the get_job method
+    /// to check the job status of a recently submitted job.
+    ///
+    pub async fn get_json_result(&self, job_id: &str) -> Result<RetrieveTranscriptResponse> {
         let url = self
             .batch_url
             .join("jobs/")?
@@ -125,10 +235,30 @@ impl BatchClient {
         Ok(serde_res)
     }
 
-    pub async fn get_text_result(
-        &self,
-        job_id: &str,
-    ) -> Result<String> {
+    /// Gets the text result of a batch job.
+    /// This will only include the transcript, without any meta data, translations or summary.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use std::println;
+    /// use speechmatics_async::batch::BatchClient;
+    /// 
+    /// let batch_client = BatchClient::new("API_KEY", None).unwrap();
+    /// let get_result_res = batch_client.get_text_result("JOB_ID").await.unwrap();
+    /// println!("{:?}", get_result_res);
+    /// ```
+    /// 
+    /// # Errors
+    /// 
+    /// This function can error with the usual HTTP status code errors.
+    /// It will also error if it fails to parse the server response for whatever reason.
+    /// 
+    /// A common failure state occurs when requesting a result for an incomplete job.
+    /// To this end, you should implement polling based on the get_job method
+    /// to check the job status of a recently submitted job.
+    ///
+    pub async fn get_text_result(&self, job_id: &str) -> Result<String> {
         let url = self
             .batch_url
             .join("jobs/")?
@@ -146,10 +276,30 @@ impl BatchClient {
         Ok(serde_res)
     }
 
-    pub async fn get_srt_result(
-        &self,
-        job_id: &str,
-    ) -> Result<String> {
+    /// Gets the SRT result of a batch job. This will be returned as a String.
+    /// This will only include the transcript, without any meta data, translations or summary.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use std::println;
+    /// use speechmatics_async::batch::BatchClient;
+    /// 
+    /// let batch_client = BatchClient::new("API_KEY", None).unwrap();
+    /// let get_result_res = batch_client.get_text_result("JOB_ID").await.unwrap();
+    /// println!("{:?}", get_result_res);
+    /// ```
+    /// 
+    /// # Errors
+    /// 
+    /// This function can error with the usual HTTP status code errors.
+    /// It will also error if it fails to parse the server response for whatever reason.
+    /// 
+    /// A common failure state occurs when requesting a result for an incomplete job.
+    /// To this end, you should implement polling based on the get_job method
+    /// to check the job status of a recently submitted job.
+    ///
+    pub async fn get_srt_result(&self, job_id: &str) -> Result<String> {
         let url = self
             .batch_url
             .join("jobs/")?
@@ -167,6 +317,29 @@ impl BatchClient {
         Ok(serde_res)
     }
 
+    /// Delete a given job.
+    /// 
+    /// Incomplete jobs cannot normally be deleted.
+    /// If the optional force parameter is provided, then the job will be deleted even if it isn't yet completed.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use std::println;
+    /// use speechmatics_async::batch::BatchClient;
+    /// 
+    /// let batch_client = BatchClient::new("API_KEY", None).unwrap();
+    /// let get_result_res = batch_client.delete_job("JOB_ID", Some(true)).await.unwrap();
+    /// ```
+    /// 
+    /// # Errors
+    /// 
+    /// This function can error with the usual HTTP status code errors.
+    /// It will also error if it fails to parse the server response for whatever reason.
+    /// 
+    /// A common failure state occurs when trying to delete a job currently being processed.
+    /// To avoid this, either poll for the job status, or set the optional force parameter to true.
+    ///
     pub async fn delete_job(&self, job_id: &str, force: Option<bool>) -> Result<DeleteJobResponse> {
         let url = self.batch_url.join("jobs/")?.join(job_id)?;
 
@@ -220,7 +393,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_submit_job_success() {
-        let api_key: String = std::env::var("SM_API_KEY").unwrap();
+        let api_key: String = std::env::var("API_KEY").unwrap();
         let batch_client = BatchClient::new(&api_key, None).unwrap();
 
         let job_res = submit_job_util(&batch_client).await.unwrap();
@@ -229,7 +402,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_job() {
-        let api_key: String = std::env::var("SM_API_KEY").unwrap();
+        let api_key: String = std::env::var("API_KEY").unwrap();
         let batch_client = BatchClient::new(&api_key, None).unwrap();
 
         let job_res = submit_job_util(&batch_client).await.unwrap();
@@ -244,7 +417,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_jobs() {
-        let api_key: String = std::env::var("SM_API_KEY").unwrap();
+        let api_key: String = std::env::var("API_KEY").unwrap();
         let batch_client = BatchClient::new(&api_key, None).unwrap();
 
         let _ = submit_job_util(&batch_client).await.unwrap();
@@ -256,7 +429,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_json_result() {
-        let api_key: String = std::env::var("SM_API_KEY").unwrap();
+        let api_key: String = std::env::var("API_KEY").unwrap();
         let batch_client = BatchClient::new(&api_key, None).unwrap();
 
         let job_res = submit_job_util(&batch_client).await.unwrap();
@@ -276,10 +449,7 @@ mod tests {
                 std::thread::sleep(std::time::Duration::from_millis(3000));
             }
         }
-        let get_result_res = batch_client
-            .get_json_result(&job_res.id)
-            .await
-            .unwrap();
+        let get_result_res = batch_client.get_json_result(&job_res.id).await.unwrap();
         println!("{:?}", get_result_res);
         assert!(get_result_res.job.data_name == "example.wav");
         assert!(get_result_res.results.len() != 0)
@@ -287,7 +457,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_text_result() {
-        let api_key: String = std::env::var("SM_API_KEY").unwrap();
+        let api_key: String = std::env::var("API_KEY").unwrap();
         let batch_client = BatchClient::new(&api_key, None).unwrap();
 
         let job_res = submit_job_util(&batch_client).await.unwrap();
@@ -307,16 +477,13 @@ mod tests {
                 std::thread::sleep(std::time::Duration::from_millis(3000));
             }
         }
-        let get_result_res = batch_client
-            .get_text_result(&job_res.id)
-            .await
-            .unwrap();
+        let get_result_res = batch_client.get_text_result(&job_res.id).await.unwrap();
         assert!(get_result_res.len() != 0)
     }
 
     #[tokio::test]
     async fn test_delete_job() {
-        let api_key: String = std::env::var("SM_API_KEY").unwrap();
+        let api_key: String = std::env::var("API_KEY").unwrap();
         let batch_client = BatchClient::new(&api_key, None).unwrap();
 
         let job_res = submit_job_util(&batch_client).await.unwrap();
