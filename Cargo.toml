@@ -1,6 +1,37 @@
-[workspace]
-workspace.resolver = "2"
-members = [
-    "speechmatics-async",
-    "speechmatics",
-]
+[package]
+name = "speechmatics"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0"
+tokio-tungstenite = { version = "0.19.0", features = ["native-tls"], optional = true }
+base64 = "0.21.4"
+futures = "0.3.28"
+futures-io = "0.3.28"
+http = { version = "0.2.9", optional = true }
+log = "0.4.20"
+rand = { version = "0.8.5", optional = true }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "*", features = ["macros", "rt", "sync", "rt-multi-thread"], optional = true }
+url = "2.4.1"
+reqwest = { version = "0.11.20", features = ["multipart", "stream", "json"], optional = true }
+
+[dev-dependencies.async-std]
+version = "1.12.0"
+features = ["attributes"]
+
+[features]
+realtime = ["dep:tokio-tungstenite", "dep:tokio", "dep:http"]
+batch = ["dep:reqwest", "dep:rand"]
+
+[[example]]
+name = "basic-realtime"
+path = "examples/basic-realtime.rs"
+
+[[example]]
+name = "batch-job-lifecycle"
+path = "examples/batch-job-lifecycle.rs"
