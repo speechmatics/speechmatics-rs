@@ -1,8 +1,8 @@
 #!/bin/bash
 
-OUTPUT_RT_MODELS_DIRECTORY='../speechmatics-async/src/realtime/models'
-OUTPUT_RT_SYNC_MODELS_DIRECTORY='../speechmatics/src/realtime/models'
-OUTPUT_BATCH_MODELS_DIRECTORY='../speechmatics-async/src/batch/models'
+OUTPUT_BATCH_MODELS_DIRECTORY='../speechmatics/src/batch/models'
+OUTPUT_RT_MODELS_DIRECTORY='../speechmatics/src/realtime/models'
+
 
 pip3 install -r requirements.txt
 
@@ -22,10 +22,6 @@ find ./openapi_models_tmp/src/models/ -name '*.rs' -exec sed -i '' -e 's/crate::
 mkdir -p ${OUTPUT_RT_MODELS_DIRECTORY}
 rm -r  ${OUTPUT_RT_MODELS_DIRECTORY}/*
 cp ./openapi_models_tmp/src/models/* ${OUTPUT_RT_MODELS_DIRECTORY}
-
-mkdir -p ${OUTPUT_RT_SYNC_MODELS_DIRECTORY}
-rm -r  ${OUTPUT_RT_SYNC_MODELS_DIRECTORY}/*
-cp ./openapi_models_tmp/src/models/* ${OUTPUT_RT_SYNC_MODELS_DIRECTORY}
 
 # Delete temp files
 rm openapi-transformed.yaml
