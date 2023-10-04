@@ -1,7 +1,7 @@
 on:
   push:
     tags:        
-      - 'sm-async/*'
+      - '*'
   workflow_dispatch:
 
 name: Publish
