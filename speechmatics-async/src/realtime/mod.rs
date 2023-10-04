@@ -25,7 +25,7 @@ use std::{println as error, println as debug, println as info, println as warn};
 #[cfg(not(test))]
 use log::{debug, error, info, warn};
 
-use self::handlers::Attach;
+use handlers::Attach;
 
 /// A module that includes all the utlities for attaching handlers to the Realtime Session
 pub mod handlers;
@@ -43,17 +43,42 @@ pub const DEFAULT_RT_URL: &str = "wss://neu.rt.speechmatics.com/v2/en";
 
 /// The default ISO language code, which sets it to English.
 pub const DEFAULT_LANGUAGE: &str = "en";
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Struct which is passed into run (and then start_recognition) to configure the realtime session.
 /// It implements default, which sets the language as English and otherwise sets everything to the API default.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SessionConfig {
     /// Config for the transcription part of the service. This is an optional property and defaults to standard English transcription.
-    pub transcription_config: Option<models::TranscriptionConfig>,
+    pub transcription_config: models::TranscriptionConfig,
     /// Config for the translation part of the service. This is an optional property and defaults to None.
     pub translation_config: Option<models::TranslationConfig>,
     /// Config to tell the server what kind of audio to expect. This is an optional property and defaults to raw pcm audio.
     pub audio_format: Option<models::AudioFormat>,
+}
+
+impl SessionConfig {
+    /// Create a new instance of session config.
+    ///
+    /// If no transcription_config is provided, then it will set it to run a default English Standard session.
+    /// By default, no audio format or translation config will be set, as the server will infer this.
+    ///
+    pub fn new(
+        transcription_config: Option<models::TranscriptionConfig>,
+        translation_config: Option<models::TranslationConfig>,
+        audio_format: Option<models::AudioFormat>,
+    ) -> Self {
+        let mut transc_conf = models::TranscriptionConfig::default();
+        transc_conf.language = "en".to_string();
+        if let Some(t_conf) = transcription_config {
+            transc_conf = t_conf
+        };
+        Self {
+            transcription_config: transc_conf,
+            translation_config,
+            audio_format,
+        }
+    }
 }
 
 impl Default for SessionConfig {
@@ -63,7 +88,7 @@ impl Default for SessionConfig {
         let translation_config: models::TranslationConfig = Default::default();
         let audio_format: models::AudioFormat = Default::default();
         Self {
-            transcription_config: Some(transcription_config),
+            transcription_config: transcription_config,
             translation_config: Some(translation_config),
             audio_format: Some(audio_format),
         }
@@ -101,9 +126,10 @@ impl RealtimeSession {
         if let Some(temp_url) = rt_url {
             url = temp_url
         }
+        let formatted_url = format!("{}?sm-sdk=rust-{}", url, VERSION);
         let sesh = Self {
             auth_token,
-            rt_url: url,
+            rt_url: formatted_url,
             handlers: handlers::EventHandlers::new(),
             running: false,
         };
@@ -133,7 +159,10 @@ impl RealtimeSession {
             .unwrap_or_else(|| authority);
 
         if host.is_empty() {
-            todo!();
+            return Err(anyhow::Error::from(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "uri host was empty",
+            )));
         }
         let auth_header = format!("Bearer {}", self.auth_token.clone());
 
@@ -176,7 +205,10 @@ impl RealtimeSession {
                         warn!("Failed to get data from stream, {:?}", err);
                         retries += 1;
                         if retries > max_retries {
-                            todo!()
+                            return Err(Into::into(std::io::Error::new(
+                                std::io::ErrorKind::ConnectionAborted,
+                                "Recognition failed to start on the server",
+                            )));
                         }
                         continue;
                     }
@@ -197,15 +229,31 @@ impl RealtimeSession {
                             "Could not read value of message into RecognitionStarted struct, {:?}",
                             err
                         );
-                        retries += 1;
-                        if retries > max_retries {
-                            todo!()
+                        match serde_json::from_slice::<models::Error>(&bin_data) {
+                            Ok(mess) => {
+                                return Err(Into::into(std::io::Error::new(
+                                    std::io::ErrorKind::ConnectionAborted,
+                                    format!("Received error from server {}", mess.reason),
+                                )));
+                            },
+                            Err(_) => {
+                                retries += 1;
+                                if retries > max_retries {
+                                    return Err(Into::into(std::io::Error::new(
+                                        std::io::ErrorKind::ConnectionAborted,
+                                        "Recognition failed to start on the server",
+                                    )));
+                                }
+                                continue;
+                            },
                         }
-                        continue;
                     }
                 };
             } else {
-                todo!()
+                return Err(Into::into(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    "Failed to receive message from the server",
+                )));
             }
         }
         Ok(())
@@ -284,6 +332,15 @@ impl RealtimeSession {
                         debug!("detected EndOfTranscript message, quitting");
                         self.running = false;
                     };
+                    if models::Messages::Error == msg {
+                        let mess: models::Error = from_slice(&data)?;
+                        error!("Received error from server {}", mess.reason);
+                        self.running = false;
+                        return Err(Into::into(std::io::Error::new(
+                            std::io::ErrorKind::ConnectionAborted,
+                            format!("Received error from server {}", mess.reason),
+                        )));
+                    }
                     self.handlers.handle_event(msg, data).await?;
                 } else {
                     error!(
@@ -291,7 +348,10 @@ impl RealtimeSession {
                     );
                 };
             } else {
-                todo!()
+                return Err(Into::into(std::io::Error::new(
+                    std::io::ErrorKind::ConnectionAborted,
+                    format!("Did not receive a message"),
+                )));
             }
         }
         debug!("Exited message processing loop");
@@ -376,9 +436,7 @@ impl SenderWrapper {
         if let Some(aud) = config.audio_format {
             message.audio_format = Box::new(aud);
         }
-        if let Some(transc) = config.transcription_config {
-            message.transcription_config = Box::new(transc);
-        }
+        message.transcription_config = Box::new(config.transcription_config);
         if let Some(transl) = config.translation_config {
             message.translation_config = Some(Box::new(transl));
         }

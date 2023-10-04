@@ -272,7 +272,7 @@ impl BatchClient {
         let res = self.client.get(url).query(&queries).send().await;
         let result = res?.error_for_status()?.bytes().await?;
 
-        let serde_res = serde_json::from_slice::<String>(&result)?;
+        let serde_res = String::from_utf8(result.to_vec())?;
         Ok(serde_res)
     }
 
