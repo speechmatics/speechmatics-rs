@@ -12,7 +12,7 @@ async fn main() {
 
     // set up the path to the file and load in the config
     let test_file_path = PathBuf::new()
-        .join("..")
+        .join(".")
         .join("tests")
         .join("data")
         .join("example.wav");

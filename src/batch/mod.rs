@@ -364,7 +364,7 @@ mod tests {
 
     async fn submit_job_util(batch_client: &BatchClient) -> Result<CreateJobResponse> {
         let test_file_path = PathBuf::new()
-            .join("..")
+            .join(".")
             .join("tests")
             .join("data")
             .join("example.wav");

@@ -14,7 +14,7 @@ async fn main() {
     let mut rt_session = RealtimeSession::new(api_key, None).unwrap();
 
     let test_file_path = PathBuf::new()
-        .join("..")
+        .join(".")
         .join("tests")
         .join("data")
         .join("example.wav");
