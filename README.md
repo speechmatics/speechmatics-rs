@@ -1,6 +1,6 @@
-# speechmatics
+# Speechmatics Rust SDK
 
-**IMPORTANT: This is a work in progress, the API is subject to significant change and much of the error handling is currently lacking. We hope to eventually get this code to a production state, but for now it should serve as a guide to what a rust implementation could look like. We welcome contributions, please don't hesitate to reach out!**
+**IMPORTANT: This is a work in progress, the API is subject to significant change and much of the error handling is currently lacking. We hope to eventually get this code to a production state, but for now it should serve as a guide to what a rust implementation could look like. We welcome contributions, so please don't hesitate to reach out!**
 
 This crate uses [tokio-tungstenite](https://docs.rs/tokio-tungstenite/latest/tokio_tungstenite/) for realtime and [reqwest](https://docs.rs/reqwest/latest/reqwest/), and should fit nicely into your async rust stack to allow you to run transcription tasks asynchronously alongside other tasks.
 
@@ -10,6 +10,8 @@ First things first, setting your desired feature flags. These options are:
 
 1. realtime - enables realtime features, causes tokio and tokio-tungstenite to be installed as dependencies
 2. batch - enabled batch features, causes reqwest and rand to be installed as dependencies
+
+In order to connect to the API, you will also need an API key. You can get a key from our [portal](https://portal.speechmatics.com/manage-access/). You'll need to create a free account to access the portal (no credit card required).
 
 ## Transcribing In Realtime
 
@@ -115,7 +117,7 @@ async fn main() {
 
 ## Examples
 
-You can find more examples of the code in the [examples folder](./examples/). They are mostly a rehash of the code snippets in this file - because our API is just that simple!
+You can find more examples of the code in the [examples folder](./examples/). In order to run the examples, you will need to set the API_KEY environment variable. This should be your API key for the speechmatics API.
 
 ## Getting Help
 

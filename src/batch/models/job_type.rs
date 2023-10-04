@@ -12,18 +12,18 @@
 /// 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum JobType {
-    #[serde(rename = "alignment")]
-    Alignment,
     #[serde(rename = "transcription")]
     Transcription,
+    #[serde(rename = "alignment")]
+    Alignment,
 
 }
 
 impl ToString for JobType {
     fn to_string(&self) -> String {
         match self {
-            Self::Alignment => String::from("alignment"),
             Self::Transcription => String::from("transcription"),
+            Self::Alignment => String::from("alignment"),
         }
     }
 }

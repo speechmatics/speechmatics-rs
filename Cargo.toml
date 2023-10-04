@@ -29,9 +29,13 @@ realtime = ["dep:tokio-tungstenite", "dep:tokio", "dep:http"]
 batch = ["dep:reqwest", "dep:rand"]
 
 [[example]]
-name = "basic-realtime"
-path = "examples/basic-realtime.rs"
+name = "realtim-basic"
+path = "examples/realtime-basic.rs"
 
 [[example]]
-name = "batch-job-lifecycle"
-path = "examples/batch-job-lifecycle.rs"
+name = "tokio-batch"
+path = "examples/tokio-batch.rs"
+
+[[example]]
+name = "async-std-batch"
+path = "examples/async-std-batch.rs"

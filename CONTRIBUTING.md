@@ -32,3 +32,12 @@ If you are experiencing a bug, you can report it via the [issues](https://github
 ## How to Request a Feature
 
 If you want a feature, you can open a discussion via the [issues](https://github.com/speechmatics/speechmatics-rs/issues) page. Try to tag your issue with the most appropriate label available so that we can track it more easily.
+
+## Testing
+
+There is a basic level of unit test coverage in this repo. To run the tests you will need to get a Speechmatics API key. You should be able to run the tests with a free-tier account (no credit card required). The command to run the tests is:
+
+```
+export API_KEY=YOUR_KEY
+cargo test --tests --lib --all-features
+```

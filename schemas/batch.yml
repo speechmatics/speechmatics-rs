@@ -1105,8 +1105,8 @@ definitions:
   JobType:
     type: string
     enum:
-      - alignment
       - transcription
+      - alignment
   JobConfig:
     description: |
       JSON object that contains various groups of job configuration

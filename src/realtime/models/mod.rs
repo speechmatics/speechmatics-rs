@@ -1,6 +1,3 @@
-#![allow(unknown_lints)]
-#![allow(clippy::all)]
-
 pub mod add_partial_transcript;
 pub use self::add_partial_transcript::AddPartialTranscript;
 pub mod add_partial_translation;

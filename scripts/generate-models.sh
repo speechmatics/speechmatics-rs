@@ -1,7 +1,7 @@
 #!/bin/bash
 
-OUTPUT_BATCH_MODELS_DIRECTORY='../speechmatics/src/batch/models'
-OUTPUT_RT_MODELS_DIRECTORY='../speechmatics/src/realtime/models'
+OUTPUT_BATCH_MODELS_DIRECTORY='../src/batch/models'
+OUTPUT_RT_MODELS_DIRECTORY='../src/realtime/models'
 
 
 pip3 install -r requirements.txt
