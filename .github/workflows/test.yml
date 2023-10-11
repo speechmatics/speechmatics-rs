@@ -42,7 +42,7 @@ jobs:
           override: true
 
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test --all-targets
+      - run: cargo test --tests --examples --all-features
         env:
           API_KEY: ${{ secrets.API_KEY }}
 
