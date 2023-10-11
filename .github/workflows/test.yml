@@ -26,8 +26,7 @@ jobs:
           override: true
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          command: "cargo check"
+      - run: cargo check --all-features
 
   test:
     name: "Cargo test"
@@ -43,8 +42,7 @@ jobs:
           override: true
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          command: "cargo test"
+      - run: cargo test --all-features
         env:
           API_KEY: ${{ secrets.API_KEY }}
 
@@ -64,9 +62,7 @@ jobs:
       - run: "rustup component add rustfmt"
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          command: "cargo fmt"
-          args: "--all -- --check"
+      - run: cargo fmt --all-features
 
   clippy:
     name: "Cargo clippy"
@@ -84,7 +80,5 @@ jobs:
       - run: "rustup component add clippy"
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          command: "rustup clippy"
-          args: "-- -D warnings"
+      - run: cargo clippy --all-features
 
