@@ -1,6 +1,6 @@
 
 
-name: "Test"
+name: Test
 
 on: 
   push:
@@ -19,15 +19,14 @@ jobs:
       - name: "Check out the repo"
         uses: actions/checkout@v3
 
-      - uses: "actions-rs/toolchain@v1"
+      - uses: dtolnay/rust-toolchain@stable
         with:
           profile: "minimal"
           toolchain: "stable"
           override: true
 
-      - uses: "actions-rs/cargo@v1"
-        with:
-          command: "check"
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo check --all-features
 
   test:
     name: "Cargo test"
@@ -36,15 +35,14 @@ jobs:
       - name: "Check out the repo"
         uses: actions/checkout@v3
 
-      - uses: "actions-rs/toolchain@v1"
+      - uses: "dtolnay/rust-toolchain@stable"
         with:
           profile: "minimal"
           toolchain: "stable"
           override: true
 
-      - uses: "actions-rs/cargo@v1"
-        with:
-          command: "test"
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --tests --examples --all-features
         env:
           API_KEY: ${{ secrets.API_KEY }}
 
@@ -55,7 +53,7 @@ jobs:
       - name: "Check out the repo"
         uses: actions/checkout@v3
 
-      - uses: "actions-rs/toolchain@v1"
+      - uses: dtolnay/rust-toolchain@stable
         with:
           profile: "minimal"
           toolchain: "stable"
@@ -63,10 +61,8 @@ jobs:
           
       - run: "rustup component add rustfmt"
 
-      - uses: "actions-rs/cargo@v1"
-        with:
-          command: "fmt"
-          args: "--all -- --check"
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo fmt
 
   clippy:
     name: "Cargo clippy"
@@ -75,7 +71,7 @@ jobs:
       - name: "Check out the repo"
         uses: actions/checkout@v3
 
-      - uses: "actions-rs/toolchain@v1"
+      - uses: dtolnay/rust-toolchain@stable
         with:
           profile: "minimal"
           toolchain: "stable"
@@ -83,8 +79,6 @@ jobs:
 
       - run: "rustup component add clippy"
 
-      - uses: "actions-rs/cargo@v1"
-        with:
-          command: "clippy"
-          args: "-- -D warnings"
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo clippy --all-features
 
