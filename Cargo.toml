@@ -2,6 +2,13 @@
 name = "speechmatics"
 version = "0.1.0"
 edition = "2021"
+keywords = ["websocket", "speechmatics", "asr", "async"]
+authors = ["Tudor Evans"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/speechmatics/speechmatics-rs"
+repository = "https://github.com/speechmatics/speechmatics-rs"
+description = "An async rust SDK for the Speechmatics API"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
