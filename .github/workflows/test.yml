@@ -42,7 +42,7 @@ jobs:
           override: true
 
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test --all-features
+      - run: cargo test --all-targets
         env:
           API_KEY: ${{ secrets.API_KEY }}
 
@@ -62,7 +62,7 @@ jobs:
       - run: "rustup component add rustfmt"
 
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo fmt --all-features
+      - run: cargo fmt
 
   clippy:
     name: "Cargo clippy"
