@@ -1,8 +1,6 @@
 on:
-  push:
-    tags:        
-      - '*'
-  workflow_dispatch:
+  release:
+    types: [released]
 
 name: Publish
 
