@@ -3,10 +3,9 @@ use speechmatics::{
     add_event_handler,
     realtime::{handlers, models, RealtimeSession, SessionConfig},
 };
-use std::fs::File;
 use std::path::PathBuf;
 use std::pin::Pin;
-use tokio;
+use tokio::{self, fs::File};
 
 #[tokio::main]
 async fn main() {
@@ -19,7 +18,7 @@ async fn main() {
         .join("data")
         .join("example.wav");
 
-    let file = File::open(test_file_path).unwrap();
+    let file = File::open(test_file_path).await.unwrap();
 
     let mut config: SessionConfig = Default::default();
     let audio_config = models::AudioFormat::new(models::audio_format::Type::File);

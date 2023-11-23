@@ -12,9 +12,7 @@ use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use serde_json::from_slice;
 use std::boxed::Box;
-use std::io::Read;
-use tokio::join;
-use tokio::net::TcpStream;
+use tokio::{io::AsyncReadExt, join, net::TcpStream};
 use tokio_tungstenite::MaybeTlsStream;
 use tokio_tungstenite::{connect_async, tungstenite::Message, WebSocketStream};
 use url::Url;
@@ -88,7 +86,7 @@ impl Default for SessionConfig {
         let translation_config: models::TranslationConfig = Default::default();
         let audio_format: models::AudioFormat = Default::default();
         Self {
-            transcription_config: transcription_config,
+            transcription_config,
             translation_config: Some(translation_config),
             audio_format: Some(audio_format),
         }
@@ -235,7 +233,7 @@ impl RealtimeSession {
                                     std::io::ErrorKind::ConnectionAborted,
                                     format!("Received error from server {}", mess.reason),
                                 )));
-                            },
+                            }
                             Err(_) => {
                                 retries += 1;
                                 if retries > max_retries {
@@ -245,7 +243,7 @@ impl RealtimeSession {
                                     )));
                                 }
                                 continue;
-                            },
+                            }
                         }
                     }
                 };
@@ -291,7 +289,7 @@ impl RealtimeSession {
     ///     - If the audio  read loop fails, the connection will be closed and the audio failure will be returned
     ///     - If the server sends an error message, this will be returned as an error and the audio read loop will stop
     ///     - If something goes wrong deserialising json or handling the local websocket, the error will be returned
-    pub async fn run<R: Read + std::marker::Send + 'static>(
+    pub async fn run<R: AsyncReadExt + std::marker::Send + std::marker::Unpin + 'static>(
         &mut self,
         config: SessionConfig,
         reader: R,
@@ -350,7 +348,7 @@ impl RealtimeSession {
             } else {
                 return Err(Into::into(std::io::Error::new(
                     std::io::ErrorKind::ConnectionAborted,
-                    format!("Did not receive a message"),
+                    "Did not receive a message".to_string(),
                 )));
             }
         }
@@ -380,14 +378,14 @@ impl SenderWrapper {
         }
     }
 
-    async fn send_audio<R: Read + std::marker::Send + 'static>(
+    async fn send_audio<R: AsyncReadExt + std::marker::Send + std::marker::Unpin + 'static>(
         &mut self,
         mut reader: R,
     ) -> Result<()> {
         let mut buffer = vec![0u8; 8192];
         loop {
             debug!("reading audio data");
-            match reader.read(&mut buffer) {
+            match reader.read(&mut buffer).await {
                 Ok(no) => {
                     if no == 0 {
                         info!("Reader was empty, closing stream");
@@ -495,12 +493,11 @@ macro_rules! add_event_handler {
 #[cfg(test)]
 mod tests {
     use crate::realtime::*;
-    use std::fs::File;
     use std::path::PathBuf;
     use std::pin::Pin;
 
     use futures::Future;
-    use tokio;
+    use tokio::{self, fs::File};
 
     #[tokio::test]
     async fn test_basic_flow() {
@@ -513,7 +510,7 @@ mod tests {
             .join("data")
             .join("example.wav");
 
-        let file = File::open(test_file_path).unwrap();
+        let file = File::open(test_file_path).await.unwrap();
 
         let mut config: SessionConfig = Default::default();
         let audio_config = models::AudioFormat::new(models::audio_format::Type::File);

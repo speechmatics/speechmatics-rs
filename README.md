@@ -6,7 +6,7 @@ This crate uses [tokio-tungstenite](https://docs.rs/tokio-tungstenite/latest/tok
 
 ## Getting Started
 
-First things first, setting your desired feature flags. These options are:
+First things first, set your desired feature flags. These options are:
 
 1. realtime - enables realtime features, causes tokio and tokio-tungstenite to be installed as dependencies
 2. batch - enabled batch features, causes reqwest and rand to be installed as dependencies
@@ -23,10 +23,9 @@ use speechmatics::{
     add_event_handler,
     realtime::{handlers, models, RealtimeSession, SessionConfig},
 };
-use std::fs::File;
 use std::path::PathBuf;
 use std::pin::Pin;
-use tokio;
+use tokio::{self, io::File};
 
 #[tokio::main]
 async fn main() {
