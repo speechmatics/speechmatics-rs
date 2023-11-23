@@ -374,8 +374,7 @@ mod tests {
         transcription_config.language = "en".to_owned();
         config.transcription_config = Some(Box::new(transcription_config));
 
-        let job_res = batch_client.submit_job(config, test_file_path).await;
-        job_res
+        batch_client.submit_job(config, test_file_path).await
     }
 
     #[tokio::test]
@@ -384,7 +383,7 @@ mod tests {
 
         let job_res = submit_job_util(&batch_client).await;
         match job_res {
-            Ok(_) => assert!(false),
+            Ok(_) => panic!("Something went wrong with auth"),
             Err(err) => {
                 assert!(err.is::<reqwest::Error>())
             }
@@ -397,7 +396,7 @@ mod tests {
         let batch_client = BatchClient::new(&api_key, None).unwrap();
 
         let job_res = submit_job_util(&batch_client).await.unwrap();
-        assert!(job_res.id != "")
+        assert!(!job_res.id.is_empty())
     }
 
     #[tokio::test]
@@ -407,11 +406,11 @@ mod tests {
 
         let job_res = submit_job_util(&batch_client).await.unwrap();
         let get_job_res = batch_client.get_job(&job_res.id).await.unwrap();
-        assert!(get_job_res.job.data_name != "");
+        assert!(!get_job_res.job.data_name.is_empty());
         if let Some(dur) = get_job_res.job.duration {
             assert!(dur > 0);
         } else {
-            assert!(false)
+            unreachable!()
         }
     }
 
