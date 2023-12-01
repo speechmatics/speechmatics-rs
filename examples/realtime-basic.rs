@@ -1,16 +1,34 @@
-use futures::Future;
-use speechmatics::{
-    add_event_handler,
-    realtime::{handlers, models, RealtimeSession, SessionConfig},
+use speechmatics::realtime::*;
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
 };
-use std::path::PathBuf;
-use std::pin::Pin;
-use tokio::{self, fs::File};
+use tokio::{self, fs::File, try_join};
+
+struct MockStore {
+    transcript: String,
+}
+
+impl MockStore {
+    pub fn new() -> Self {
+        Self {
+            transcript: "".to_owned(),
+        }
+    }
+
+    pub fn append(&mut self, transcript: String) {
+        self.transcript = format!("{} {}", self.transcript, transcript);
+    }
+
+    pub fn print(&self) {
+        print!("{}", self.transcript)
+    }
+}
 
 #[tokio::main]
 async fn main() {
     let api_key: String = std::env::var("API_KEY").unwrap();
-    let mut rt_session = RealtimeSession::new(api_key, None).unwrap();
+    let (mut rt_session, mut receive_channel) = RealtimeSession::new(api_key, None).unwrap();
 
     let test_file_path = PathBuf::new()
         .join(".")
@@ -24,11 +42,31 @@ async fn main() {
     let audio_config = models::AudioFormat::new(models::audio_format::Type::File);
     config.audio_format = Some(audio_config);
 
-    fn closure(input: models::AddTranscript) -> Pin<Box<dyn Future<Output = ()>>> {
-        Box::pin(async move { println!("{:?}", input) })
-    }
+    let mock_store = Arc::new(Mutex::new(MockStore::new()));
+    let mock_store_clone = mock_store.clone();
 
-    add_event_handler!(&mut rt_session, handlers::AddTranscriptHandler, closure);
+    let message_task = tokio::spawn(async move {
+        while let Some(message) = receive_channel.recv().await {
+            match message {
+                ReadMessage::AddTranscript(mess) => {
+                    mock_store_clone
+                        .lock()
+                        .unwrap()
+                        .append(mess.metadata.transcript);
+                }
+                ReadMessage::EndOfTranscript(_) => return,
+                _ => {}
+            }
+        }
+    });
 
-    rt_session.run(config, file).await.unwrap();
+    let run_task = { rt_session.run(config, file) };
+
+    try_join!(
+        async move { message_task.await.map_err(anyhow::Error::from) },
+        run_task
+    )
+    .unwrap();
+
+    mock_store.lock().unwrap().print();
 }

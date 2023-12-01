@@ -16,6 +16,8 @@ openapi-generator generate -i openapi-transformed.yaml -g rust -o ./openapi_mode
 find ./openapi_models_tmp/src/models/ -name '*.rs' -exec sed -i '' -e 's/RHashType/Type/g' {} \;
 find ./openapi_models_tmp/src/models/ -name '*.rs' -exec sed -i '' -e 's/r#type/type_value/g' {} \;
 
+find ./openapi_models_tmp/src/models/ -name '*.rs' -exec sed -i '' -e 's/#\[derive(Clone, Debug, PartialEq, Serialize, Deserialize)\]/#\[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)\]/g' {} \;
+
 # Change the path to models so that it matches our crate structure
 find ./openapi_models_tmp/src/models/ -name '*.rs' -exec sed -i '' -e 's/crate::models/crate::realtime::models/g' {} \;
 
@@ -33,6 +35,8 @@ openapi-generator generate -i ../schemas/batch.yml -g rust -o ./openapi_models_t
 # Due to type being a reserved word, the type generator converts it to RHashType, so let's change it to something more friendly
 find ./openapi_models_tmp -name '*.rs' -exec sed -i '' -e 's/RHashType/Type/g' {} \;
 find ./openapi_models_tmp -name '*.rs' -exec sed -i '' -e 's/r#type/type_value/g' {} \;
+
+find ./openapi_models_tmp/src/models/ -name '*.rs' -exec sed -i '' -e 's/#\[derive(Clone, Debug, PartialEq, Serialize, Deserialize)\]/#\[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)\]/g' {} \;
 
 # Change the path to models so that it matches our crate structure
 find ./openapi_models_tmp -name '*.rs' -exec sed -i '' -e 's/crate::models/crate::batch::models/g' {} \;
