@@ -1,6 +1,6 @@
 [package]
 name = "speechmatics"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 keywords = ["websocket", "speechmatics", "asr", "async"]
 authors = ["Tudor Evans"]
@@ -46,3 +46,8 @@ path = "examples/tokio-batch.rs"
 [[example]]
 name = "async-std-batch"
 path = "examples/async-std-batch.rs"
+
+[package.metadata.docs.rs]
+
+# Whether to pass `--all-features` to Cargo (default: false)
+all-features = true
