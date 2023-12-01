@@ -24,46 +24,11 @@ with open("template-openapi.yaml", 'r') as stream:
 
 messages_models_yaml = async_spec['components']['messages']
 
-# We generate an enum of all message types as it is useful to have them all in one place
-publish_message_enum = []
-
-# We generate an enum of all message types as it is useful to have them all in one place
-subscribe_message_enum = []
-
 # Add the payload field of 'components.messages' as schemas to the generated openapi spec
 template["components"] = {"schemas": {}}
 for model_name, model_content in messages_models_yaml.items():
-    if model_name in publish_messages:
-        publish_message_enum.append(model_name)
-    else:
-        subscribe_message_enum.append(model_name)
     payload = model_content['payload']
     template['components']['schemas'][model_name] = payload
-
-# Append enum to the schemas
-template['components']['schemas']['RealtimeMessage'] = {
-    'type': "object",
-    'properties': {
-        'message': {
-            "$ref": "#/definitions/Messages"
-        }
-    },
-}
-
-template['components']['schemas']['ServerMessages'] = {
-    'type': "string",
-    'enum': subscribe_message_enum,
-}
-
-template['components']['schemas']['ClientMessages'] = {
-    'type': "string",
-    'enum': subscribe_message_enum,
-}
-
-template['components']['schemas']['Messages'] = {
-    'type': "string",
-    'enum': subscribe_message_enum,
-}
 
 # Add the schemas from async spec to the openapi generated spec
 template['components']['schemas'].update(async_spec['components']['schemas'])

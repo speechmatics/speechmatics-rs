@@ -15,42 +15,72 @@ In order to connect to the API, you will also need an API key. You can get a key
 
 ## Transcribing In Realtime
 
-To transcribe in realtime, you'll need to install the futures, tokio and speechmatics crates. Then you can run the following code in your main.rs file.  Don't forget to update the API key and file path.
+To transcribe in realtime, you'll need to install the tokio and speechmatics crates. Then you can run the following code in your main.rs file. Don't forget to update the API key and file path. The following example creates a mock store to demonstrate how outputs from the RealtimeSession can be passed through to some external state, for example a database or an API request to an external system.
 
 ```rs
-use futures::Future;
-use speechmatics::{
-    add_event_handler,
-    realtime::{handlers, models, RealtimeSession, SessionConfig},
-};
-use std::path::PathBuf;
-use std::pin::Pin;
-use tokio::{self, io::File};
+use speechmatics::realtime::*;
+use std::{path::PathBuf, sync::{Arc, Mutex}};
+use tokio::{self, fs::File, try_join};
+
+struct MockStore {
+    transcript: String
+}
+
+impl MockStore {
+    pub fn new() -> Self {
+        Self {
+            transcript: "".to_owned()
+        }
+    }
+
+    pub fn append(&mut self, transcript: String) {
+        self.transcript = format!("{} {}", self.transcript, transcript);
+    }
+
+    pub fn print(&self) {
+        print!("{}", self.transcript)
+    }
+}
 
 #[tokio::main]
 async fn main() {
     let api_key: String = std::env::var("API_KEY").unwrap();
-    let mut rt_session = RealtimeSession::new(api_key, None).unwrap();
+    let (mut rt_session, mut receive_channel) = RealtimeSession::new(api_key, None).unwrap();
 
     let test_file_path = PathBuf::new()
-        .join("..")
+        .join(".")
         .join("tests")
         .join("data")
         .join("example.wav");
 
-    let file = File::open(test_file_path).unwrap();
+    let file = File::open(test_file_path).await.unwrap();
 
     let mut config: SessionConfig = Default::default();
     let audio_config = models::AudioFormat::new(models::audio_format::Type::File);
     config.audio_format = Some(audio_config);
 
-    fn closure(input: models::AddTranscript) -> Pin<Box<dyn Future<Output = ()>>> {
-        Box::pin(async move { println!("{:?}", input) })
-    }
+    let mock_store = Arc::new(Mutex::new(MockStore::new()));
+    let mock_store_clone = mock_store.clone();
 
-    add_event_handler!(&mut rt_session, handlers::AddTranscriptHandler, closure);
+    let message_task = tokio::spawn(async move {
+        while let Some(message) = receive_channel.recv().await {
+            match message {
+                ReadMessage::AddTranscript(mess) => {
+                    mock_store_clone.lock().unwrap().append(mess.metadata.transcript);
+                },
+                ReadMessage::EndOfTranscript(_) => {
+                    return
+                },
+                _ => {}
+            }
+        }
+    });
 
-    rt_session.run(config, file).await.unwrap();
+    let run_task = { rt_session.run(config, file) };
+
+    try_join!(async move { message_task.await.map_err(anyhow::Error::from) }, run_task).unwrap();
+
+    mock_store.lock().unwrap().print(); // this should print the whole transcript, demonstrating it has successfully been stored
 }
 ```
 
