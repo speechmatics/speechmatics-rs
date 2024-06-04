@@ -201,7 +201,6 @@ impl RealtimeSession {
         let (stream, res) = connect_async(req).await?;
         if let Some(resp) = res.body() {
             error!("failed to connect {:?}", resp);
-            println!("{:?}", res);
         }
 
         let (writer, reader) = stream.split();
@@ -353,7 +352,6 @@ impl RealtimeSession {
             if let Some(val) = result {
                 let mess = val?;
                 debug!("{}", mess);
-                println!("{}", mess);
                 let data = mess.into_data();
                 // Parse the string of data into serde_json::Value.
                 let value = from_slice::<ReadMessage>(&data)?;
@@ -476,7 +474,6 @@ impl SenderWrapper {
         let message =
             models::EndOfStream::new(last_seq_no, models::end_of_stream::Message::EndOfStream);
         let serialised_msg = serde_json::to_string(&message)?;
-        println!("{}", serialised_msg);
         let tungstenite_msg = Message::from(serialised_msg);
         self.send_message(tungstenite_msg).await
     }
