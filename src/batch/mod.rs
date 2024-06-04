@@ -448,7 +448,6 @@ mod tests {
             }
         }
         let get_result_res = batch_client.get_json_result(&job_res.id).await.unwrap();
-        println!("{:?}", get_result_res);
         assert!(get_result_res.job.data_name == "example.wav");
         assert!(get_result_res.results.len() != 0)
     }
