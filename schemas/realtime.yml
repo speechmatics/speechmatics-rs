@@ -447,6 +447,17 @@ components:
           format: integer
           minimum: 2
           maximum: 100
+        prefer_current_speaker:
+          description: |
+            When set to `true`, reduces the likelihood of incorrectly switching between similar sounding speakers.
+            See [Prefer Current Speaker](https://docs.speechmatics.com/speech-to-text/features/diarization#prefer-current-speaker).
+          type: boolean
+          default: false
+        speaker_sensitivity:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
 
     OutputLocale:
       type: string
